@@ -1,0 +1,589 @@
+openapi: 3.0.0
+info:
+  title: 动态服务API
+  version: 1.0.0
+  description: 管理救助信息、领养信息、社区动态等
+servers:
+  - url: https://api.pawlink.com/v1
+    description: 生产环境
+  - url: httplocalhost:8085/v1
+    description: 本地开发
+
+paths:
+  # ========== 救助信息 ==========
+  /rescue/publish:
+    post:
+      summary: 发布救助信息
+      tags:
+        - 救助
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - animalType
+                - status
+                - location
+                - contact
+              properties:
+                animalType:
+                  type: string
+                  enum: [cat, dog, other]
+                status:
+                  type: string
+                  enum: [healthy, injured, sick]
+                location:
+                  type: string
+                  description: 位置坐标JSON {lat, lng, address}
+                description:
+                  type: string
+                breed:
+                  type: string
+                age:
+                  type: string
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                contact:
+                  type: object
+                  properties:
+                    phone:
+                      type: string
+                    wechat:
+                      type: string
+      responses:
+        "200":
+          description: 发布成功
+        "400":
+          description: 需先完成实名认证
+
+  /rescue/{id}:
+    get:
+      summary: 获取救助详情
+      tags:
+        - 救助
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 救助详情
+
+  /rescue/{id}/status:
+    put:
+      summary: 更新救助信息状态
+      tags:
+        - 救助
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [rescuing, rescued, medical, adopted, closed]
+                progress:
+                  type: string
+                  description: 进展描述
+                images:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 更新成功
+
+  /rescue/filter:
+    get:
+      summary: 救助信息筛选
+      tags:
+        - 救助
+      parameters:
+        - name: urgency
+          in: query
+          schema:
+            type: string
+            enum: [urgent, normal]
+        - name: animalType
+          in: query
+          schema:
+            type: string
+        - name: distance
+          in: query
+          schema:
+            type: integer
+            description: 距离（公里）
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [today, day, week]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: 救助列表
+
+  # ========== 领养信息 ==========
+  /adoption/publish:
+    post:
+      summary: 发布领养信息
+      tags:
+        - 领养
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - images
+                - breed
+                - age
+                - gender
+                - personality
+                - healthStatus
+                - requirements
+                - contact
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                breed:
+                  type: string
+                age:
+                  type: string
+                  enum: [young, adult, senior]
+                gender:
+                  type: string
+                  enum: [male, female]
+                size:
+                  type: string
+                  enum: [small, medium, large]
+                personality:
+                  type: string
+                healthStatus:
+                  type: object
+                  properties:
+                    vaccinated:
+                      type: boolean
+                    dewormed:
+                      type: boolean
+                    neutered:
+                      type: boolean
+                requirements:
+                  type: string
+                name:
+                  type: string
+                story:
+                  type: string
+                contact:
+                  type: object
+      responses:
+        "200":
+          description: 发布成功
+
+  /adoption/{id}:
+    get:
+      summary: 获取领养详情
+      tags:
+        - 领养
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 领养详情
+
+  /adoption/{id}/status:
+    put:
+      summary: 更新领养信息状态
+      tags:
+        - 领养
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [available, pending, adopted, closed]
+      responses:
+        "200":
+          description: 更新成功
+
+  /adoption/filter:
+    get:
+      summary: 领养信息筛选
+      tags:
+        - 领养
+      parameters:
+        - name: animalType
+          in: query
+          schema:
+            type: string
+        - name: breed
+          in: query
+          schema:
+            type: string
+        - name: age
+          in: query
+          schema:
+            type: string
+        - name: gender
+          in: query
+          schema:
+            type: string
+        - name: size
+          in: query
+          schema:
+            type: string
+        - name: vaccinated
+          in: query
+          schema:
+            type: boolean
+        - name: distance
+          in: query
+          schema:
+            type: integer
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 领养列表
+
+  # ========== 搜索 ==========
+  /search:
+    get:
+      summary: 通用搜索
+      tags:
+        - 搜索
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [rescue, adoption, all]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 搜索结果
+
+  # ========== 地图 ==========
+  /map/points:
+    get:
+      summary: 获取地图上的信息点
+      tags:
+        - 地图
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: radius
+          in: query
+          schema:
+            type: integer
+            default: 5
+            description: 半径（公里）
+        - name: types
+          in: query
+          schema:
+            type: string
+            description: 类型筛选逗号分隔
+      responses:
+        "200":
+          description: 信息点列表
+
+  /map/heatmap:
+    get:
+      summary: 获取热力图数据
+      tags:
+        - 地图
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: radius
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 热力图数据
+
+  # ========== 社区 ==========
+  /feed:
+    get:
+      summary: 获取社区信息流
+      tags:
+        - 社区
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 信息流列表
+
+  /feed/publish:
+    post:
+      summary: 发布动态
+      tags:
+        - 社区
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  maxLength: 2000
+                images:
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 发布成功
+
+  /feed/{id}:
+    get:
+      summary: 获取动态详情
+      tags:
+        - 社区
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 动态详情
+
+  /feed/{id}/like:
+    post:
+      summary: 点赞动态
+      tags:
+        - 社区
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 点赞成功
+
+  /feed/{id}/unlike:
+    post:
+      summary: 取消点赞
+      tags:
+        - 社区
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 取消成功
+
+  /feed/{id}/comment:
+    post:
+      summary: 评论动态
+      tags:
+        - 社区
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                parentId:
+                  type: string
+                  description: 回复的评论ID
+      responses:
+        "200":
+          description: 评论成功
+
+  /feed/{id}/collect:
+    post:
+      summary: 收藏动态
+      tags:
+        - 社区
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 收藏成功
+
+  # ========== 推荐 ==========
+  /recommendations:
+    get:
+      summary: 获取智能推荐
+      tags:
+        - 推荐
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [adoption, rescue]
+          default: adoption
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+      responses:
+        "200":
+          description: 推荐列表
+
+  /recommendations/match-score:
+    get:
+      summary: 获取匹配度评分
+      tags:
+        - 推荐
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: adoptionId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 匹配度评分
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

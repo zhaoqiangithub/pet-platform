@@ -2,17 +2,78 @@ openapi: 3.0.0
 info:
   title: 用户服务API
   version: 1.0.0
-  description: 管理用户注册、登录、个人信息等
+  description: 管理用户注册、登录、认证、个人信息等
 servers:
-  - url: https://api.petpal.com/v1
+  - url: https://api.pawlink.com/v1
     description: 生产环境
   - url: http://localhost:8081/v1
     description: 本地开发
 
 paths:
-  /users/login:
+  # ========== 认证相关 ==========
+  /auth/register:
+    post:
+      summary: 用户注册
+      tags:
+        - 认证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - password
+                - verificationCode
+              properties:
+                phone:
+                  type: string
+                  description: 手机号
+                  example: "13800138000"
+                password:
+                  type: string
+                  description: 密码（至少8位，含字母数字）
+                  example: "Password123"
+                verificationCode:
+                  type: string
+                  description: 6位验证码
+                  example: "123456"
+                nickname:
+                  type: string
+                  description: 昵称（可选）
+                  example: "爱心大使"
+      responses:
+        "200":
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  message:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                        example: "user_123"
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIs..."
+        "400":
+          description: 请求参数错误
+
+  /auth/login:
     post:
       summary: 用户登录
+      tags:
+        - 认证
       requestBody:
         required: true
         content:
@@ -43,16 +104,354 @@ paths:
                   code:
                     type: integer
                     example: 0
-                  message:
-                    type: string
-                    example: "success"
                   data:
                     type: object
                     properties:
                       token:
                         type: string
                         example: "eyJhbGciOiJIUzI1NiIs..."
-        "400":
-          description: 请求参数错误
         "401":
           description: 认证失败（密码错误/账户锁定）
+
+  /auth/send-code:
+    post:
+      summary: 发送验证码
+      tags:
+        - 认证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - type
+              properties:
+                phone:
+                  type: string
+                  example: "13800138000"
+                type:
+                  type: string
+                  enum: [register, login, reset_password]
+                  description: 验证码类型
+      responses:
+        "200":
+          description: 发送成功
+
+  /auth/reset-password:
+    post:
+      summary: 忘记密码
+      tags:
+        - 认证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - verificationCode
+                - newPassword
+              properties:
+                phone:
+                  type: string
+                verificationCode:
+                  type: string
+                newPassword:
+                  type: string
+      responses:
+        "200":
+          description: 重置成功
+
+  /auth/real-name-auth:
+    post:
+      summary: 实名认证
+      tags:
+        - 认证
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - idCardFront
+                - idCardBack
+              properties:
+                realName:
+                  type: string
+                  description: 真实姓名
+                idCardNumber:
+                  type: string
+                  description: 身份证号
+                idCardFront:
+                  type: string
+                  format: binary
+                  description: 身份证正面照片
+                idCardBack:
+                  type: string
+                  format: binary
+                  description: 身份证背面照片
+                faceImage:
+                  type: string
+                  format: binary
+                  description: 人脸识别照片
+      responses:
+        "200":
+          description: 提交成功，等待审核
+        "400":
+          description: 认证失败
+
+  /auth/volunteer-auth:
+    post:
+      summary: 志愿者认证申请
+      tags:
+        - 认证
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - skills
+                - agreedToBackgroundCheck
+              properties:
+                skills:
+                  type: array
+                  items:
+                    type: string
+                    enum: [rescue, medical, transport, training]
+                  description: 技能标签
+                experience:
+                  type: string
+                  description: 救助经验描述
+                agreedToBackgroundCheck:
+                  type: boolean
+                  description: 是否同意背景调查
+      responses:
+        "200":
+          description: 申请已提交
+
+  /auth/organization-auth:
+    post:
+      summary: 救助机构认证申请
+      tags:
+        - 认证
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - organizationName
+                - businessLicense
+              properties:
+                organizationName:
+                  type: string
+                address:
+                  type: string
+                contactPhone:
+                  type: string
+                description:
+                  type: string
+                businessLicense:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: 申请已提交
+
+  /auth/status:
+    get:
+      summary: 获取认证状态
+      tags:
+        - 认证
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 认证状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  realNameAuth:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [none, pending, approved, rejected]
+                      creditScore:
+                        type: integer
+                  volunteerAuth:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      skills:
+                        type: array
+                        items:
+                          type: string
+                  organizationAuth:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      organizationName:
+                        type: string
+
+  # ========== 用户信息 ==========
+  /user/profile:
+    get:
+      summary: 获取个人资料
+      tags:
+        - 用户
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 个人资料详情
+
+  /user/profile:
+    put:
+      summary: 更新个人资料
+      tags:
+        - 用户
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname:
+                  type: string
+                avatar:
+                  type: string
+                bio:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+
+  /user/{userId}:
+    get:
+      summary: 获取其他用户公开资料
+      tags:
+        - 用户
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 用户公开资料
+
+  /user/{userId}/follow:
+    post:
+      summary: 关注用户
+      tags:
+        - 用户
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 关注成功
+
+  /user/{userId}/followers:
+    get:
+      summary: 获取粉丝列表
+      tags:
+        - 用户
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: 粉丝列表
+
+  /user/{userId}/following:
+    get:
+      summary: 获取关注列表
+      tags:
+        - 用户
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 关注列表
+
+  /user/preferences:
+    put:
+      summary: 设置用户偏好
+      tags:
+        - 用户
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                preferredBreeds:
+                  type: array
+                  items:
+                    type: string
+                preferredAge:
+                  type: string
+                  enum: [young, adult, senior, any]
+                preferredSize:
+                  type: string
+                  enum: [small, medium, large, any]
+                notificationsEnabled:
+                  type: boolean
+      responses:
+        "200":
+          description: 设置成功
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,0 +1,314 @@
+openapi: 3.0.0
+info:
+  title: 志愿者服务API
+  version: 1.0.0
+  description: 管理志愿者任务、积分、技能认证等
+servers:
+  - url: https://api.pawlink.com/v1
+    description: 生产环境
+  - url: http://localhost:8088/v1
+    description: 本地开发
+
+paths:
+  # ========== 任务 ==========
+  /volunteer/tasks:
+    get:
+      summary: 获取可认领任务列表
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: distance
+          in: query
+          schema:
+            type: integer
+            description: 距离筛选（公里）
+        - name: skillRequired
+          in: query
+          schema:
+            type: string
+            enum: [rescue, medical, transport, training]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, claimed, completed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 任务列表
+
+  /volunteer/tasks/{id}:
+    get:
+      summary: 获取任务详情
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 任务详情
+
+  /volunteer/tasks/{id}/claim:
+    post:
+      summary: 认领任务
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 认领成功
+        "409":
+          description: 任务已被认领
+
+  /volunteer/tasks/{id}/complete:
+    post:
+      summary: 提交任务完成
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proofImages
+              properties:
+                proofImages:
+                  type: array
+                  items:
+                    type: string
+                description:
+                  type: string
+      responses:
+        "200":
+          description: 提交成功，等待确认
+
+  /volunteer/tasks/{id}/confirm:
+    post:
+      summary: 确认任务完成
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 确认成功
+
+  /volunteer/tasks/{id}/evaluate:
+    post:
+      summary: 评价志愿者
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+      responses:
+        "200":
+          description: 评价成功
+
+  /volunteer/my-tasks:
+    get:
+      summary: 我的任务列表
+      tags:
+        - 任务
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [claimed, completed, confirmed]
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [creator, executor]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 我的任务列表
+
+  # ========== 积分 ==========
+  /volunteer/points:
+    get:
+      summary: 获取积分余额
+      tags:
+        - 积分
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 积分余额
+
+  /volunteer/points/history:
+    get:
+      summary: 积分记录
+      tags:
+        - 积分
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [earn, spend]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 积分记录列表
+
+  /volunteer/rankings:
+    get:
+      summary: 积分排行榜
+      tags:
+        - 积分
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year]
+            default: month
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: 排行榜
+
+  # ========== 技能认证 ==========
+  /volunteer/skills/apply:
+    post:
+      summary: 申请技能认证
+      tags:
+        - 技能
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - skillType
+                - proofMaterials
+              properties:
+                skillType:
+                  type: string
+                  enum: [medical, transport, rescue, training]
+                proofMaterials:
+                  type: array
+                  items:
+                    type: string
+                  description: 证明材料URL
+                description:
+                  type: string
+      responses:
+        "200":
+          description: 申请已提交
+
+  /volunteer/skills:
+    get:
+      summary: 我的技能认证
+      tags:
+        - 技能
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 技能列表
+
+  # ========== 签到 ==========
+  /volunteer/check-in:
+    post:
+      summary: 每日签到
+      tags:
+        - 签到
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 签到成功
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
