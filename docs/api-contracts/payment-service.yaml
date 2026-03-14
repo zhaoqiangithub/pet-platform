@@ -1,0 +1,292 @@
+openapi: 3.0.0
+info:
+  title: 支付与众筹服务API
+  version: 1.0.0
+  description: 管理支付、众筹、捐款等
+servers:
+  - url: https://api.pawlink.com/v1
+    description: 生产环境
+  - url: http://localhost:8087/v1
+    description: 本地开发
+
+paths:
+  # ========== 众筹 ==========
+  /crowdfunding/create:
+    post:
+      summary: 创建众筹
+      tags:
+        - 众筹
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetAmount
+                - rescueId
+                - hospitalName
+                - budgetDetails
+              properties:
+                targetAmount:
+                  type: number
+                  description: 目标金额
+                rescueId:
+                  type: string
+                  description: 关联的救助信息ID
+                hospitalName:
+                  type: string
+                budgetDetails:
+                  type: string
+                  description: 预算明细
+                deadline:
+                  type: string
+                  format: date
+                  description: 截止日期（7-30天）
+                proofImages:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 创建成功，等待审核
+
+  /crowdfunding/{id}:
+    get:
+      summary: 获取众筹详情
+      tags:
+        - 众筹
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 众筹详情
+
+  /crowdfunding/{id}/donate:
+    post:
+      summary: 捐款
+      tags:
+        - 众筹
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - paymentMethod
+              properties:
+                amount:
+                  type: number
+                  description: 捐款金额
+                paymentMethod:
+                  type: string
+                  enum: [wechat, alipay]
+                anonymous:
+                  type: boolean
+                  default: false
+                  description: 是否匿名
+                donorName:
+                  type: string
+                  description: 署名（匿名时忽略）
+      responses:
+        "200":
+          description: 返回支付参数
+
+  /crowdfunding/{id}/donations:
+    get:
+      summary: 获取捐款记录
+      tags:
+        - 众筹
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 捐款记录列表
+
+  /crowdfunding/my:
+    get:
+      summary: 我的众筹
+      tags:
+        - 众筹
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [creator, donor]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, success, failed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 众筹列表
+
+  # ========== 支付 ==========
+  /payment/create-order:
+    post:
+      summary: 创建支付订单
+      tags:
+        - 支付
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - amount
+                - paymentMethod
+              properties:
+                type:
+                  type: string
+                  enum: [donation, subsidy, purchase]
+                amount:
+                  type: number
+                paymentMethod:
+                  type: string
+                  enum: [wechat, alipay]
+                metadata:
+                  type: object
+                  description: 附加数据
+      responses:
+        "200":
+          description: 返回支付参数
+
+  /payment/callback:
+    post:
+      summary: 支付回调
+      tags:
+        - 支付
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: 处理成功
+
+  /payment/history:
+    get:
+      summary: 支付记录
+      tags:
+        - 支付
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 支付记录列表
+
+  # ========== 志愿者补贴 ==========
+  /volunteer/subsidy/apply:
+    post:
+      summary: 申请志愿者补贴
+      tags:
+        - 志愿者
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - taskId
+                - amount
+                - reason
+              properties:
+                taskId:
+                  type: string
+                amount:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: 申请已提交
+
+  /volunteer/subsidy/history:
+    get:
+      summary: 补贴收入记录
+      tags:
+        - 志愿者
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 补贴记录
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

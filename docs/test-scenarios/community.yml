@@ -1,0 +1,36 @@
+# 社区功能测试场景
+name: 社区功能测试
+description: 覆盖发布动态、点赞、评论、关注等场景
+priority: medium
+tags: [community, social]
+
+steps:
+  - name: 发布救助故事
+    given: 已完成实名认证的用户
+    when: 编写故事内容（最多2000字），添加照片，选择话题标签，发布
+    then: 动态进入社区信息流，显示发布成功
+
+  - name: 点赞动态
+    given: 用户A查看用户B的动态
+    when: 点击点赞按钮
+    then: 点赞数+1，点赞按钮变为已点赞状态，用户B收到通知
+
+  - name: 取消点赞
+    given: 用户A已点赞某动态
+    when: 再次点击点赞按钮
+    then: 点赞数-1，点赞按钮恢复未点赞状态
+
+  - name: 评论动态
+    given: 用户A查看用户B的动态
+    when: 输入评论内容，提交评论
+    then: 评论显示在动态评论区，用户B收到评论通知
+
+  - name: 关注用户
+    given: 用户A查看用户B的主页
+    when: 点击"关注"按钮
+    then: 关注成功，用户A的关注列表增加用户B，用户B的粉丝数+1
+
+  - name: 关注用户动态优先显示
+    given: 用户A已关注用户B和用户C
+    when: 查看社区信息流
+    then: 用户B和用户C的动态优先显示在信息流顶部
