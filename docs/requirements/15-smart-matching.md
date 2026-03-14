@@ -58,6 +58,13 @@
 
 P2（增强功能，提升长期留存）
 
+## 相关文档
+
+- API契约：`@../api-contracts/feed-service.yaml`
+- API契约：`@../api-contracts/user-service.yaml`
+- 测试场景：`@../test-scenarios/search-filter.yml`
+- 架构决策：`@../decisions/001-use-spring-cloud.md`
+
 ## 备注
 
 - 智能匹配是提升用户体验的关键功能

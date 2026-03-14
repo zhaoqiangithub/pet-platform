@@ -83,6 +83,13 @@
 
 P2（增强功能，增强用户粘性）
 
+## 相关文档
+
+- API契约：`@../api-contracts/feed-service.yaml`
+- API契约：`@../api-contracts/user-service.yaml`
+- 测试场景：`@../test-scenarios/community.yml`
+- 架构决策：`@../decisions/001-use-spring-cloud.md`
+
 ## 备注
 
 - 社区功能运营成本较高，需要专人维护

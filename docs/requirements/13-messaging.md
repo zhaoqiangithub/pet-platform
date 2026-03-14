@@ -91,6 +91,13 @@
 
 P1（重要功能，促进交易/救助达成）
 
+## 相关文档
+
+- API契约：`@../api-contracts/message-service.yaml`
+- 测试场景：`@../test-scenarios/private-message.yml`
+- 测试场景：`@../test-scenarios/report.yml`
+- 架构决策：`@../decisions/001-use-spring-cloud.md`
+
 ## 备注
 
 - 私信是连接救助者和领养者的关键功能

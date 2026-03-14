@@ -79,6 +79,12 @@
 
 P0（核心功能，必须优先实现）
 
+## 相关文档
+
+- API契约：`@../api-contracts/feed-service.yaml`
+- 测试场景：`@../test-scenarios/search-filter.yml`
+- 架构决策：`@../decisions/001-use-spring-cloud.md`
+
 ## 备注
 
 - 搜索转化率是核心指标，应>35%
