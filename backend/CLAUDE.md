@@ -225,16 +225,20 @@ class RescueServiceTest {
 | 层级 | 注解 | 速度 | 用途 |
 |------|------|------|------|
 | 单元测试 | @ExtendWith(MockitoExtension.class) | 快 | 验证Service业务逻辑 |
-| Controller测试 | @WebMvcTest | 中 | 验证API端点 |
+| Controller测试 | @WebMvcTest / @SpringBootTest | 中 | 验证API端点 |
 | 集成测试 | @SpringBootTest + TestContainers | 慢 | 验证完整业务流程 |
+
+> ⚠️ **重要**：集成测试需要Docker环境，默认跳过。PR前必须运行集成测试验证。
 
 ### 禁止偷懒行为
 
 - 禁止：只写Service层测试，删除Controller测试
 - 禁止：使用@SpringBootTest但不加外部依赖Mock
 - 禁止：测试失败后跳过或删除测试用例
+- 禁止：跳过集成测试直接提交PR
 - 必须：每个Controller方法至少有一个测试用例
 - 必须：使用正确的测试配置禁用外部依赖
+- 必须：PR前在本地运行集成测试验证
 
 ### 已知测试陷阱
 
@@ -260,6 +264,49 @@ class RescueControllerTest {
 
     @MockBean
     private NotificationServiceFeignClient notificationServiceFeignClient;
+}
+```
+
+### 集成测试配置示例
+
+每个微服务的 pom.xml 需要添加以下配置：
+
+```xml
+<!-- TestContainers依赖 -->
+<dependency>
+    <groupId>org.testcontainers</groupId>
+    <artifactId>postgresql</artifactId>
+    <version>1.19.3</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.testcontainers</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>1.19.3</version>
+    <scope>test</scope>
+</dependency>
+
+<!-- Maven Surefire配置：默认跳过集成测试 -->
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <configuration>
+        <excludedGroups>integration</excludedGroups>
+    </configuration>
+</plugin>
+```
+
+集成测试类示例：
+
+```java
+@Tag("integration")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class RescueIntegrationTest extends AbstractIntegrationTest {
+
+    @Test
+    void publishAndGetRescue_Success() {
+        // 测试完整业务流程
+    }
 }
 ```
 
@@ -290,8 +337,11 @@ cd user-service && mvn spring-boot:run
 # 构建镜像
 cd user-service && mvn jib:build -Dimage=myregistry/pet-user-service
 
-# 运行测试（单个服务）
+# 运行单元测试和Controller测试（默认，不需Docker）
 cd user-service && mvn test
+
+# 运行集成测试（需要Docker环境）
+cd user-service && mvn test -Dgroups=integration
 
 # 运行契约测试
 mvn contract:test
