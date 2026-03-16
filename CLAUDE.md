@@ -10,20 +10,20 @@ PetPal是一个跨平台宠物服务平台，支持Web、iOS、Android三端。�
 - **契约驱动**：前后端通过OpenAPI契约通信，服务间通过Feign调用。
 
 ## 目录结构
-| 模块 | 路径 | 技术栈 | 关键文件 |
-|------|------|--------|----------|
-| 前端跨平台 | `/frontend/` | Expo + React Native Web | `App.tsx`, `package.json` |
-| 用户服务 | `/backend/user-service/` | Spring Boot + MyBatis | `UserApplication.java` |
-| 宠物服务 | `/backend/pet-service/` | Spring Boot | `PetApplication.java` |
-| 商品服务 | `/backend/product-service/` | Spring Boot | `ProductApplication.java` |
-| 订单服务 | `/backend/order-service/` | Spring Boot | `OrderApplication.java` |
-| 预约服务 | `/backend/appointment-service/` | Spring Boot | `AppointmentApplication.java` |
-| 问诊服务 | `/backend/consult-service/` | Spring Boot | `ConsultApplication.java` |
-| 动态服务 | `/backend/feed-service/` | Spring Boot | `FeedApplication.java` |
-| 通知服务 | `/backend/notification-service/` | Spring Boot | `NotificationApplication.java` |
-| 网关 | `/backend/gateway-service/` | Spring Cloud Gateway | `GatewayApplication.java` |
-| 文档 | `/docs/` | Markdown + OpenAPI | `api-contracts/`, `requirements/` |
-| K8s配置 | `/k8s/` | YAML | `deployments/`, `services/` |
+| 模块       | 路径                             | 技术栈                  | 关键文件                          |
+| ---------- | -------------------------------- | ----------------------- | --------------------------------- |
+| 前端跨平台 | `/frontend/`                     | Expo + React Native Web | `App.tsx`, `package.json`         |
+| 用户服务   | `/backend/user-service/`         | Spring Boot + MyBatis   | `UserApplication.java`            |
+| 宠物服务   | `/backend/pet-service/`          | Spring Boot             | `PetApplication.java`             |
+| 商品服务   | `/backend/product-service/`      | Spring Boot             | `ProductApplication.java`         |
+| 订单服务   | `/backend/order-service/`        | Spring Boot             | `OrderApplication.java`           |
+| 预约服务   | `/backend/appointment-service/`  | Spring Boot             | `AppointmentApplication.java`     |
+| 问诊服务   | `/backend/consult-service/`      | Spring Boot             | `ConsultApplication.java`         |
+| 动态服务   | `/backend/feed-service/`         | Spring Boot             | `FeedApplication.java`            |
+| 通知服务   | `/backend/notification-service/` | Spring Boot             | `NotificationApplication.java`    |
+| 网关       | `/backend/gateway-service/`      | Spring Cloud Gateway    | `GatewayApplication.java`         |
+| 文档       | `/docs/`                         | Markdown + OpenAPI      | `api-contracts/`, `requirements/` |
+| K8s配置    | `/k8s/`                          | YAML                    | `deployments/`, `services/`       |
 
 ## 开发环境要求
 - Node.js 20+ (前端)
@@ -55,7 +55,7 @@ kubectl apply -f k8s/user-service/
 # 全量测试
 ./scripts/test-all.sh
 
-关键规则（AI必须遵守）
+ 关键规则（AI必须遵守）
 架构边界
 前端只能通过网关调用后端API，禁止直接访问微服务。
 
@@ -70,7 +70,7 @@ kubectl apply -f k8s/user-service/
 
 后端：所有服务必须实现统一异常处理、统一响应格式。
 
-测试：新功能必须包含单元测试和E2E测试场景（YAML描述）。
+测试：新功能必须包含单元测试和E2E测试场景（YAML描述）,开发需求同时根据测试场景生成前后端对应的测试代码。
 
 安全：敏感数据加密存储，日志脱敏，JWT在网关统一鉴权。
 

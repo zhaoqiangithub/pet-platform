@@ -14,6 +14,9 @@
 - **存储**：AsyncStorage（移动端） + localStorage（Web）
 - **测试**：Jest + React Native Testing Library + Detox（移动端E2E）+ Playwright（Web E2E）
 
+## 界面风格指南
+详见 `@./UI-GUIDE.md`
+
 ## 目录结构
 frontend/
 ├── src/

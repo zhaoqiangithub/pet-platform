@@ -192,16 +192,16 @@ text
   - `t_user_address` (id, user_id, receiver, phone, province, city, district, detail, is_default)
 
 ## API端点（参考OpenAPI契约）
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/v1/users/register` | 用户注册 |
-| POST | `/api/v1/users/login` | 登录（返回JWT） |
-| GET  | `/api/v1/users/profile` | 获取个人信息 |
-| PUT  | `/api/v1/users/profile` | 更新个人信息 |
-| GET  | `/api/v1/users/addresses` | 地址列表 |
-| POST | `/api/v1/users/addresses` | 新增地址 |
-| PUT  | `/api/v1/users/addresses/{id}` | 更新地址 |
-| DELETE | `/api/v1/users/addresses/{id}` | 删除地址 |
+| 方法   | 路径                           | 描述            |
+| ------ | ------------------------------ | --------------- |
+| POST   | `/api/v1/users/register`       | 用户注册        |
+| POST   | `/api/v1/users/login`          | 登录（返回JWT） |
+| GET    | `/api/v1/users/profile`        | 获取个人信息    |
+| PUT    | `/api/v1/users/profile`        | 更新个人信息    |
+| GET    | `/api/v1/users/addresses`      | 地址列表        |
+| POST   | `/api/v1/users/addresses`      | 新增地址        |
+| PUT    | `/api/v1/users/addresses/{id}` | 更新地址        |
+| DELETE | `/api/v1/users/addresses/{id}` | 删除地址        |
 
 完整契约见：`@../../docs/api-contracts/user-service.yaml`
 
@@ -223,3 +223,36 @@ mvn test
 mvn jib:build -Dimage=myregistry/pet-user-service
 依赖的其他服务
 无（独立服务，但会调用通知服务发送验证码）
+
+## 测试开发规范
+
+ ### 开发流程
+ 1. **先编译主代码**：编写测试前，先执行 `mvn clean compile` 确保主代码无编译错误
+ 2. **编写测试代码**：使用与主代码相同的包路径
+ 3. **验证测试**：执行 `mvn test` 验证测试通过
+
+ ### 测试文件组织
+ - 单元测试：`src/test/java/` 目录
+ - 测试资源配置：`src/test/resources/` 目录
+ - 测试类命名：`{ClassName}Test.java`
+
+ ### 避免常见错误
+ - 确保主代码已编译（先运行 `mvn clean compile`）
+ - 测试类的包路径需与被测试类一致
+ - Mock 外部依赖（数据库、服务）
+ - 使用 H2 内存数据库进行集成测试
+
+ ### 运行测试
+ ```bash
+ # 编译主代码（必须先执行）
+ cd backend/{service} && mvn clean compile
+
+ # 运行测试
+ cd backend/{service} && mvn test
+
+ 验证清单
+
+ - 主代码编译无错误
+ - 测试代码编译无错误
+ - 所有测试用例通过
+ - 测试覆盖核心业务逻辑
