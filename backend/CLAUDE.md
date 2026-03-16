@@ -341,7 +341,10 @@ cd user-service && mvn jib:build -Dimage=myregistry/pet-user-service
 cd user-service && mvn test
 
 # 运行集成测试（需要Docker环境）
-cd user-service && mvn test -Dgroups=integration
+cd user-service && mvn test -Pintegration-tests
+
+# CI运行所有测试
+cd user-service && mvn test -Pdefault,integration-tests
 
 # 运行契约测试
 mvn contract:test

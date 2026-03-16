@@ -22,6 +22,14 @@ spring:
     username: sa
     password:
 
+  # 集成测试时使用schema.sql初始化
+  sql:
+    init:
+      mode: always
+
+  jackson:
+    property-naming-strategy: LOWER_CAMEL_CASE
+
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl

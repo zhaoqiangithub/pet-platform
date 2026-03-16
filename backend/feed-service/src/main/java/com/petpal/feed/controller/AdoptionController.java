@@ -26,7 +26,7 @@ public class AdoptionController {
     @Operation(summary = "发布领养信息", description = "用户发布领养信息，需先完成实名认证")
     public Result<Adoption> publish(
             @RequestHeader("X-User-Id") Long userId,
-            @Valid @ModelAttribute AdoptionPublishRequest request) {
+            @Valid @RequestBody AdoptionPublishRequest request) {
         Adoption adoption = adoptionService.publish(userId, request);
         return Result.success("发布成功，请等待审核", adoption);
     }

@@ -28,7 +28,7 @@ public class RescueController {
     @Operation(summary = "发布救助信息", description = "用户发布救助信息，需先完成实名认证")
     public Result<Rescue> publish(
             @RequestHeader("X-User-Id") Long userId,
-            @Valid @ModelAttribute RescuePublishRequest request) {
+            @Valid @RequestBody RescuePublishRequest request) {
         Rescue rescue = rescueService.publish(userId, request);
         return Result.success("发布成功，请等待审核", rescue);
     }
