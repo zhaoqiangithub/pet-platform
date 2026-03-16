@@ -1,0 +1,72 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: feed-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pet_feed
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: dev
+      config:
+        server-addr: localhost:8848
+        namespace: dev
+        file-extension: yaml
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.petpal.feed.model
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.petpal.feed: DEBUG
+    org.springframework.cloud.openfeign: DEBUG
