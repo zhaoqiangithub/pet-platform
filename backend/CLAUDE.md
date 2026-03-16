@@ -134,6 +134,135 @@ Redis序列化：JSON（方便跨服务查看）
 
 性能测试：JMeter脚本放在src/test/jmeter。
 
+### 测试配置文件（必须创建）
+
+每个微服务必须创建 `src/test/resources/application.yml`：
+
+```yaml
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  cloud:
+    nacos:
+      config:
+        import-check:
+          enabled: false
+      discovery:
+        enabled: false
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+```
+
+### Controller测试示例
+
+使用 @WebMvcTest 进行轻量级Controller测试：
+
+```java
+@WebMvcTest(RescueController.class)
+class RescueControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private RescueService rescueService;
+
+    @Test
+    void publish_Success() throws Exception {
+        when(rescueService.publish(anyLong(), any())).thenReturn(new Rescue());
+
+        mockMvc.perform(post("/api/v1/rescue/publish")
+                .header("X-User-Id", "100")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"animalType\":\"cat\",\"healthStatus\":\"healthy\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+    }
+}
+```
+
+### Service单元测试示例
+
+```java
+@ExtendWith(MockitoExtension.class)
+class RescueServiceTest {
+
+    @Mock
+    private RescueMapper rescueMapper;
+
+    @InjectMocks
+    private RescueService rescueService;
+
+    @Test
+    void publish_Success() {
+        when(rescueMapper.insert(any(Rescue.class))).thenReturn(1);
+
+        Rescue result = rescueService.publish(userId, request);
+
+        assertNotNull(result);
+        verify(rescueMapper, times(1)).insert(any(Rescue.class));
+    }
+}
+```
+
+### 测试分层策略
+
+| 层级 | 注解 | 速度 | 用途 |
+|------|------|------|------|
+| 单元测试 | @ExtendWith(MockitoExtension.class) | 快 | 验证Service业务逻辑 |
+| Controller测试 | @WebMvcTest | 中 | 验证API端点 |
+| 集成测试 | @SpringBootTest + TestContainers | 慢 | 验证完整业务流程 |
+
+### 禁止偷懒行为
+
+- 禁止：只写Service层测试，删除Controller测试
+- 禁止：使用@SpringBootTest但不加外部依赖Mock
+- 禁止：测试失败后跳过或删除测试用例
+- 必须：每个Controller方法至少有一个测试用例
+- 必须：使用正确的测试配置禁用外部依赖
+
+### 已知测试陷阱
+
+**@WebMvcTest 与 @FeignClient 冲突**
+
+当服务使用 @EnableFeignClients 时，@WebMvcTest 会尝试加载 Feign 客户端，导致需要 Nacos/注册中心。
+
+解决方案：
+1. 使用 @MockBean  Mock 所有 Feign 客户端
+2. 添加 @ActiveProfiles("test") 确保加载测试配置
+3. 或者使用 @SpringBootTest(webEnvironment = WebEnvironment.MOCK)
+
+```java
+@WebMvcTest(RescueController.class)
+@ActiveProfiles("test")
+class RescueControllerTest {
+
+    @MockBean
+    private RescueService rescueService;
+
+    @MockBean
+    private UserServiceFeignClient userServiceFeignClient;
+
+    @MockBean
+    private NotificationServiceFeignClient notificationServiceFeignClient;
+}
+```
+
 安全规范
 认证：OAuth2 JWT，网关统一鉴权，微服务内部通过X-User-Id头传递用户信息。
 
