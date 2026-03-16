@@ -11,21 +11,21 @@ export const MARKER_COLORS = {
 // 状态颜色
 export const STATUS_COLORS = {
   // 救助状态
-  pending: '#F59E0B',
+  rescuePending: '#F59E0B',
   rescuing: '#EF4444',
   rescued: '#3B82F6',
   medical: '#EF4444',
-  adopted: '#10B981',
+  rescueAdopted: '#10B981',
   closed: '#6B7280',
 
   // 领养状态
   available: '#10B981',
-  'pending': '#F59E0B',
+  adoptionPending: '#F59E0B',
   adopted: '#3B82F6',
 
   // 审核状态
   approved: '#10B981',
-  rejected: '#EF4444',
+  rejected: '#EF4440',
 } as const;
 
 // 动物类型颜色

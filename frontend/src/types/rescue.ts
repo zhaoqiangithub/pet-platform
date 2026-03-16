@@ -1,7 +1,7 @@
 // 救助类型定义
 
 export type AnimalType = 'cat' | 'dog' | 'other';
-export type HealthStatus = 'healthy' | 'injured' | 'sick';
+export type RescueHealthStatus = 'healthy' | 'injured' | 'sick';
 export type RescueStatus = 'pending' | 'rescuing' | 'rescued' | 'medical' | 'adopted' | 'closed';
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 
@@ -15,7 +15,7 @@ export interface Rescue {
   id: number;
   userId: number;
   animalType: AnimalType;
-  healthStatus: HealthStatus;
+  healthStatus: RescueHealthStatus;
   rescueStatus: RescueStatus;
   locationLat: number;
   locationLng: number;
@@ -34,7 +34,7 @@ export interface Rescue {
 
 export interface RescuePublishRequest {
   animalType: AnimalType;
-  healthStatus: HealthStatus;
+  healthStatus: RescueHealthStatus;
   locationLat: number;
   locationLng: number;
   address?: string;

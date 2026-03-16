@@ -4,7 +4,13 @@
       "Bash(mvn clean compile:*)",
       "Bash(java:*)",
       "Bash(mvn test:*)",
-      "Bash(mvn clean test:*)"
+      "Bash(mvn clean test:*)",
+      "Bash(pnpm test)",
+      "Bash(npm:*)",
+      "Bash(pnpm install)",
+      "Bash(pnpm install:*)",
+      "Bash(npx create-expo-app@latest . --template blank)",
+      "Bash(pnpm:*)"
     ]
   }
 }

@@ -12,7 +12,7 @@ import { useRescuePublish } from '../hooks/useRescuePublish';
 import { ImageUploader } from '../components/ImageUploader';
 import { LocationPicker } from '../components/LocationPicker';
 import { THEME_COLORS } from '../constants/colors';
-import type { AnimalType, HealthStatus } from '../types/rescue';
+import type { AnimalType, RescueHealthStatus } from '../types/rescue';
 
 interface PublishRescueScreenProps {
   navigation?: any;
@@ -24,7 +24,7 @@ const ANIMAL_TYPES: { value: AnimalType; label: string; emoji: string }[] = [
   { value: 'other', label: '其他', emoji: '🐾' },
 ];
 
-const HEALTH_STATUSES: { value: HealthStatus; label: string; emoji: string }[] = [
+const HEALTH_STATUSES: { value: RescueHealthStatus; label: string; emoji: string }[] = [
   { value: 'healthy', label: '健康', emoji: '💚' },
   { value: 'injured', label: '受伤', emoji: '🤕' },
   { value: 'sick', label: '生病', emoji: '🤒' },
@@ -36,7 +36,7 @@ export const PublishRescueScreen: React.FC<PublishRescueScreenProps> = ({
   const { publish, loading } = useRescuePublish();
 
   const [animalType, setAnimalType] = useState<AnimalType | null>(null);
-  const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
+  const [healthStatus, setHealthStatus] = useState<RescueHealthStatus | null>(null);
   const [locationLat, setLocationLat] = useState<number | undefined>();
   const [locationLng, setLocationLng] = useState<number | undefined>();
   const [address, setAddress] = useState<string>('');
