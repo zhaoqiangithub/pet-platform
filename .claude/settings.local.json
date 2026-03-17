@@ -10,7 +10,10 @@
       "Bash(pnpm install)",
       "Bash(pnpm install:*)",
       "Bash(npx create-expo-app@latest . --template blank)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(docker build:*)"
     ]
   }
 }

@@ -310,14 +310,14 @@ class RescueIntegrationTest extends AbstractIntegrationTest {
 }
 ```
 
-安全规范
+## 安全规范
 认证：OAuth2 JWT，网关统一鉴权，微服务内部通过X-User-Id头传递用户信息。
 
 敏感数据：手机号、身份证等加密存储（AES），日志脱敏。
 
 防SQL注入：使用MyBatis参数绑定，禁止${}拼接。
 
-部署规范
+## 部署规范
 容器镜像：使用Jib构建，基础镜像eclipse-temurin:21-jre-alpine。
 
 K8s部署：每个服务对应一个Deployment + Service + ConfigMap + Secret，Ingress暴露网关。
@@ -326,8 +326,46 @@ K8s部署：每个服务对应一个Deployment + Service + ConfigMap + Secret，
 
 滚动更新：配置readinessProbe和livenessProbe，确保零宕机发布。
 
+## Dockerfile生成规范
+
+### 通用模板
+每个微服务根目录必须包含`Dockerfile`，内容如下（以user-service为例）：
+```dockerfile
+# 多阶段构建示例
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /app
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN ./mvnw dependency:go-offline -B
+COPY src src
+RUN ./mvnw package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Jib替代方案
+若使用Jib构建（已在pom.xml中配置），可省略Dockerfile，但需确保Jib配置正确。AI应能根据项目情况判断使用哪种方式。
+
+生成时机
+新服务创建时，AI必须生成Dockerfile。
+
+修改基础镜像、暴露端口、添加健康检查等，AI应同步更新Dockerfile。
+
+### Dockerfile验证
+AI生成或修改Dockerfile后，应执行：
+```bash
+docker build -t ${SERVICE_NAME}:test .
+```
+
 常用命令
-bash
+```bash
 # 编译所有服务
 mvn clean package
 
@@ -348,6 +386,8 @@ cd user-service && mvn test -Pdefault,integration-tests
 
 # 运行契约测试
 mvn contract:test
+````
+
 引用文档
 API契约：@../docs/api-contracts/
 
@@ -361,7 +401,6 @@ text
 
 ### 4. 微服务示例：`/backend/user-service/CLAUDE.md`
 
-```markdown
 # 用户服务 (user-service)
 
 ## 职责
@@ -405,6 +444,7 @@ mvn test
 mvn jib:build -Dimage=myregistry/pet-user-service
 依赖的其他服务
 无（独立服务，但会调用通知服务发送验证码）
+```
 
 ## 测试开发规范
 
@@ -431,6 +471,7 @@ mvn jib:build -Dimage=myregistry/pet-user-service
 
  # 运行测试
  cd backend/{service} && mvn test
+ ```
 
  验证清单
 

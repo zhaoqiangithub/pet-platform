@@ -90,6 +90,35 @@ npm install --save-dev jest @testing-library/react-native @testing-library/jest-
 - 路由名称常量定义在`navigation/routes.ts`。
 - 使用`useNavigation`和`useRoute`进行导航和参数获取。
 
+## 前端容器化（Web端）
+
+### Dockerfile生成规范
+如需将前端Web应用容器化部署（例如通过Nginx serve），应在`/frontend`目录生成以下`Dockerfile`：
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
+COPY . .
+RUN pnpm build:web
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+```
+nginx.conf需提供基本配置（可让AI生成默认模板）。
+
+构建命令：docker build -t pet-frontend:latest .
+
+### Dockerfile验证
+AI生成或修改前端Dockerfile后，应执行：
+```bash
+hadolint Dockerfile
+docker build -t pet-frontend:test .
+
 ---
 
 ## 测试规范（核心新增内容）
