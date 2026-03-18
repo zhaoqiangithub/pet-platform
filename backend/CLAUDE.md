@@ -134,14 +134,190 @@ Redis序列化：JSON（方便跨服务查看）
 
 性能测试：JMeter脚本放在src/test/jmeter。
 
-安全规范
+### 测试配置文件（必须创建）
+
+每个微服务必须创建 `src/test/resources/application.yml`：
+
+```yaml
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  cloud:
+    nacos:
+      config:
+        import-check:
+          enabled: false
+      discovery:
+        enabled: false
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+```
+
+### Controller测试示例
+
+使用 @WebMvcTest 进行轻量级Controller测试：
+
+```java
+@WebMvcTest(RescueController.class)
+class RescueControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private RescueService rescueService;
+
+    @Test
+    void publish_Success() throws Exception {
+        when(rescueService.publish(anyLong(), any())).thenReturn(new Rescue());
+
+        mockMvc.perform(post("/api/v1/rescue/publish")
+                .header("X-User-Id", "100")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"animalType\":\"cat\",\"healthStatus\":\"healthy\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+    }
+}
+```
+
+### Service单元测试示例
+
+```java
+@ExtendWith(MockitoExtension.class)
+class RescueServiceTest {
+
+    @Mock
+    private RescueMapper rescueMapper;
+
+    @InjectMocks
+    private RescueService rescueService;
+
+    @Test
+    void publish_Success() {
+        when(rescueMapper.insert(any(Rescue.class))).thenReturn(1);
+
+        Rescue result = rescueService.publish(userId, request);
+
+        assertNotNull(result);
+        verify(rescueMapper, times(1)).insert(any(Rescue.class));
+    }
+}
+```
+
+### 测试分层策略
+
+| 层级 | 注解 | 速度 | 用途 |
+|------|------|------|------|
+| 单元测试 | @ExtendWith(MockitoExtension.class) | 快 | 验证Service业务逻辑 |
+| Controller测试 | @WebMvcTest / @SpringBootTest | 中 | 验证API端点 |
+| 集成测试 | @SpringBootTest + TestContainers | 慢 | 验证完整业务流程 |
+
+> ⚠️ **重要**：集成测试需要Docker环境，默认跳过。PR前必须运行集成测试验证。
+
+### 禁止偷懒行为
+
+- 禁止：只写Service层测试，删除Controller测试
+- 禁止：使用@SpringBootTest但不加外部依赖Mock
+- 禁止：测试失败后跳过或删除测试用例
+- 禁止：跳过集成测试直接提交PR
+- 必须：每个Controller方法至少有一个测试用例
+- 必须：使用正确的测试配置禁用外部依赖
+- 必须：PR前在本地运行集成测试验证
+
+### 已知测试陷阱
+
+**@WebMvcTest 与 @FeignClient 冲突**
+
+当服务使用 @EnableFeignClients 时，@WebMvcTest 会尝试加载 Feign 客户端，导致需要 Nacos/注册中心。
+
+解决方案：
+1. 使用 @MockBean  Mock 所有 Feign 客户端
+2. 添加 @ActiveProfiles("test") 确保加载测试配置
+3. 或者使用 @SpringBootTest(webEnvironment = WebEnvironment.MOCK)
+
+```java
+@WebMvcTest(RescueController.class)
+@ActiveProfiles("test")
+class RescueControllerTest {
+
+    @MockBean
+    private RescueService rescueService;
+
+    @MockBean
+    private UserServiceFeignClient userServiceFeignClient;
+
+    @MockBean
+    private NotificationServiceFeignClient notificationServiceFeignClient;
+}
+```
+
+### 集成测试配置示例
+
+每个微服务的 pom.xml 需要添加以下配置：
+
+```xml
+<!-- TestContainers依赖 -->
+<dependency>
+    <groupId>org.testcontainers</groupId>
+    <artifactId>postgresql</artifactId>
+    <version>1.19.3</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.testcontainers</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>1.19.3</version>
+    <scope>test</scope>
+</dependency>
+
+<!-- Maven Surefire配置：默认跳过集成测试 -->
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <configuration>
+        <excludedGroups>integration</excludedGroups>
+    </configuration>
+</plugin>
+```
+
+集成测试类示例：
+
+```java
+@Tag("integration")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class RescueIntegrationTest extends AbstractIntegrationTest {
+
+    @Test
+    void publishAndGetRescue_Success() {
+        // 测试完整业务流程
+    }
+}
+```
+
+## 安全规范
 认证：OAuth2 JWT，网关统一鉴权，微服务内部通过X-User-Id头传递用户信息。
 
 敏感数据：手机号、身份证等加密存储（AES），日志脱敏。
 
 防SQL注入：使用MyBatis参数绑定，禁止${}拼接。
 
-部署规范
+## 部署规范
 容器镜像：使用Jib构建，基础镜像eclipse-temurin:21-jre-alpine。
 
 K8s部署：每个服务对应一个Deployment + Service + ConfigMap + Secret，Ingress暴露网关。
@@ -150,8 +326,46 @@ K8s部署：每个服务对应一个Deployment + Service + ConfigMap + Secret，
 
 滚动更新：配置readinessProbe和livenessProbe，确保零宕机发布。
 
+## Dockerfile生成规范
+
+### 通用模板
+每个微服务根目录必须包含`Dockerfile`，内容如下（以user-service为例）：
+```dockerfile
+# 多阶段构建示例
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /app
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN ./mvnw dependency:go-offline -B
+COPY src src
+RUN ./mvnw package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Jib替代方案
+若使用Jib构建（已在pom.xml中配置），可省略Dockerfile，但需确保Jib配置正确。AI应能根据项目情况判断使用哪种方式。
+
+生成时机
+新服务创建时，AI必须生成Dockerfile。
+
+修改基础镜像、暴露端口、添加健康检查等，AI应同步更新Dockerfile。
+
+### Dockerfile验证
+AI生成或修改Dockerfile后，应执行：
+```bash
+docker build -t ${SERVICE_NAME}:test .
+```
+
 常用命令
-bash
+```bash
 # 编译所有服务
 mvn clean package
 
@@ -161,11 +375,19 @@ cd user-service && mvn spring-boot:run
 # 构建镜像
 cd user-service && mvn jib:build -Dimage=myregistry/pet-user-service
 
-# 运行测试（单个服务）
+# 运行单元测试和Controller测试（默认，不需Docker）
 cd user-service && mvn test
+
+# 运行集成测试（需要Docker环境）
+cd user-service && mvn test -Pintegration-tests
+
+# CI运行所有测试
+cd user-service && mvn test -Pdefault,integration-tests
 
 # 运行契约测试
 mvn contract:test
+````
+
 引用文档
 API契约：@../docs/api-contracts/
 
@@ -179,7 +401,6 @@ text
 
 ### 4. 微服务示例：`/backend/user-service/CLAUDE.md`
 
-```markdown
 # 用户服务 (user-service)
 
 ## 职责
@@ -192,16 +413,16 @@ text
   - `t_user_address` (id, user_id, receiver, phone, province, city, district, detail, is_default)
 
 ## API端点（参考OpenAPI契约）
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/v1/users/register` | 用户注册 |
-| POST | `/api/v1/users/login` | 登录（返回JWT） |
-| GET  | `/api/v1/users/profile` | 获取个人信息 |
-| PUT  | `/api/v1/users/profile` | 更新个人信息 |
-| GET  | `/api/v1/users/addresses` | 地址列表 |
-| POST | `/api/v1/users/addresses` | 新增地址 |
-| PUT  | `/api/v1/users/addresses/{id}` | 更新地址 |
-| DELETE | `/api/v1/users/addresses/{id}` | 删除地址 |
+| 方法   | 路径                           | 描述            |
+| ------ | ------------------------------ | --------------- |
+| POST   | `/api/v1/users/register`       | 用户注册        |
+| POST   | `/api/v1/users/login`          | 登录（返回JWT） |
+| GET    | `/api/v1/users/profile`        | 获取个人信息    |
+| PUT    | `/api/v1/users/profile`        | 更新个人信息    |
+| GET    | `/api/v1/users/addresses`      | 地址列表        |
+| POST   | `/api/v1/users/addresses`      | 新增地址        |
+| PUT    | `/api/v1/users/addresses/{id}` | 更新地址        |
+| DELETE | `/api/v1/users/addresses/{id}` | 删除地址        |
 
 完整契约见：`@../../docs/api-contracts/user-service.yaml`
 
@@ -223,3 +444,38 @@ mvn test
 mvn jib:build -Dimage=myregistry/pet-user-service
 依赖的其他服务
 无（独立服务，但会调用通知服务发送验证码）
+```
+
+## 测试开发规范
+
+ ### 开发流程
+ 1. **先编译主代码**：编写测试前，先执行 `mvn clean compile` 确保主代码无编译错误
+ 2. **编写测试代码**：使用与主代码相同的包路径
+ 3. **验证测试**：执行 `mvn test` 验证测试通过
+
+ ### 测试文件组织
+ - 单元测试：`src/test/java/` 目录
+ - 测试资源配置：`src/test/resources/` 目录
+ - 测试类命名：`{ClassName}Test.java`
+
+ ### 避免常见错误
+ - 确保主代码已编译（先运行 `mvn clean compile`）
+ - 测试类的包路径需与被测试类一致
+ - Mock 外部依赖（数据库、服务）
+ - 使用 H2 内存数据库进行集成测试
+
+ ### 运行测试
+ ```bash
+ # 编译主代码（必须先执行）
+ cd backend/{service} && mvn clean compile
+
+ # 运行测试
+ cd backend/{service} && mvn test
+ ```
+
+ 验证清单
+
+ - 主代码编译无错误
+ - 测试代码编译无错误
+ - 所有测试用例通过
+ - 测试覆盖核心业务逻辑

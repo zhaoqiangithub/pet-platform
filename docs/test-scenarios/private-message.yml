@@ -1,0 +1,36 @@
+# 私信沟通测试场景
+name: 私信功能测试
+description: 覆盖发送私信、快速联系、已读未读等场景
+priority: high
+tags: [messaging, communication]
+
+steps:
+  - name: 发送文字私信
+    given: 用户A和用户B
+    when: 用户A向用户B发送文字消息"你好，我想了解这只猫"
+    then: 用户B收到消息，消息显示在对话列表中
+
+  - name: 发送图片消息
+    given: 用户A和用户B
+    when: 用户A向用户B发送图片
+    then: 用户B看到图片消息
+
+  - name: 标记已读
+    given: 用户B有未读消息
+    when: 用户B打开对话
+    then: 消息标记为已读，未读数减少
+
+  - name: 快速电话联系
+    given: 用户A查看领养信息详情
+    when: 点击"联系Ta"->"电话联系"
+    then: 弹出确认拨打电话对话框，确认后拨打
+
+  - name: 快速微信联系
+    given: 用户A查看领养信息详情
+    when: 点击"联系Ta"->"微信联系"
+    then: 复制微信号到剪贴板，提示"微信号已复制"
+
+  - name: 被拉黑无法发送消息
+    given: 用户A已被用户B拉黑
+    when: 用户A尝试向用户B发送消息
+    then: 提示"对方已将您拉黑"，发送失败

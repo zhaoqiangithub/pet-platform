@@ -1,0 +1,39 @@
+# Docker Registry - 轻量级私有镜像仓库
+# 版本: 2.8
+# 用途: 开发/测试环境
+
+version: '3.8'
+
+services:
+  registry:
+    image: registry:2.8
+    container_name: pet-registry
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry_data:/var/lib/registry
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Web UI for Registry (可选)
+  registry-ui:
+    image: joxit/docker-registry-ui:static
+    container_name: pet-registry-ui
+    ports:
+      - "8081:80"
+    environment:
+      - REGISTRY_URL=http://registry:5000
+      - DELETE_IMAGES=true
+    depends_on:
+      - registry
+    restart: always
+
+volumes:
+  registry_data:
+    driver: local

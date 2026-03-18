@@ -1,0 +1,308 @@
+openapi: 3.0.0
+info:
+  title: 消息服务API
+  version: 1.0.0
+  description: 管理私信、通知、举报等
+servers:
+  - url: https://api.pawlink.com/v1
+    description: 生产环境
+  - url: http://localhost:8086/v1
+    description: 本地开发
+
+paths:
+  # ========== 私信 ==========
+  /messages:
+    get:
+      summary: 获取消息列表
+      tags:
+        - 私信
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: 会话列表
+
+  /messages/{conversationId}:
+    get:
+      summary: 获取对话详情
+      tags:
+        - 私信
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 消息历史
+
+  /messages/send:
+    post:
+      summary: 发送消息
+      tags:
+        - 私信
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - receiverId
+                - content
+              properties:
+                receiverId:
+                  type: string
+                content:
+                  type: string
+                type:
+                  type: string
+                  enum: [text, image, location]
+                  default: text
+                imageUrl:
+                  type: string
+                location:
+                  type: object
+                  properties:
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                    address:
+                      type: string
+      responses:
+        "200":
+          description: 发送成功
+        "403":
+          description: 对方已将你拉黑
+
+  /messages/{conversationId}/read:
+    post:
+      summary: 标记已读
+      tags:
+        - 私信
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 标记成功
+
+  /messages/quick-contact:
+    post:
+      summary: 快速联系
+      tags:
+        - 私信
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetId
+                - type
+              properties:
+                targetId:
+                  type: string
+                type:
+                  type: string
+                  enum: [message, phone, wechat]
+                itemId:
+                  type: string
+                  description: 关联的信息ID（领养/救助）
+      responses:
+        "200":
+          description: 操作成功
+
+  # ========== 举报 ==========
+  /messages/report:
+    post:
+      summary: 举报用户或信息
+      tags:
+        - 举报
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetId
+                - type
+                - reason
+                - description
+              properties:
+                targetId:
+                  type: string
+                  description: 被举报用户ID或信息ID
+                targetType:
+                  type: string
+                  enum: [user, rescue, adoption, message]
+                type:
+                  type: string
+                  enum: [fake, abuse, harassment, scam, other]
+                description:
+                  type: string
+                  minLength: 20
+      responses:
+        "200":
+          description: 举报已提交
+
+  # ========== 黑名单 ==========
+  /messages/block:
+    post:
+      summary: 加入黑名单
+      tags:
+        - 黑名单
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                report:
+                  type: boolean
+                  description: 是否同时举报
+      responses:
+        "200":
+          description: 操作成功
+
+  /messages/block-list:
+    get:
+      summary: 获取黑名单列表
+      tags:
+        - 黑名单
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 黑名单列表
+
+  /messages/block/{userId}:
+    delete:
+      summary: 移除黑名单
+      tags:
+        - 黑名单
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 移除成功
+
+  # ========== 通知 ==========
+  /notifications:
+    get:
+      summary: 获取通知列表
+      tags:
+        - 通知
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: 通知列表
+
+  /notifications/unread-count:
+    get:
+      summary: 获取未读通知数
+      tags:
+        - 通知
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 未读数量
+
+  /notifications/{id}/read:
+    post:
+      summary: 标记通知已读
+      tags:
+        - 通知
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 标记成功
+
+  /notifications/read-all:
+    post:
+      summary: 全部标记已读
+      tags:
+        - 通知
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 操作成功
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

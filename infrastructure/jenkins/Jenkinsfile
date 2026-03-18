@@ -1,0 +1,267 @@
+// Jenkins Pipeline - 宠物平台 CI/CD
+// 支持多分支构建
+// 使用 Docker Pipeline 管理工具版本
+
+pipeline {
+    // 默认使用 Docker 容器
+    agent {
+        docker {
+            image 'maven:3.9-eclipse-temurin-17'
+            label 'docker'
+            args '-v /root/.m2:/root/.m2'
+        }
+    }
+
+    environment {
+        // GitHub Container Registry 配置
+        REGISTRY_URL = 'ghcr.io'
+        REGISTRY_OWNER = 'zhaoqiangithub'
+        IMAGE_NAME = 'pet-platform'
+        DOCKER_REGISTRY = "${REGISTRY_URL}/${REGISTRY_OWNER}/${IMAGE_NAME}"
+
+        // GitHub 凭证 (需要在 Jenkins 中配置 github-token)
+        GITHUB_TOKEN = credentials('github-token')
+
+        // K8s 配置 (从环境变量或默认值读取)
+        K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
+        K8S_SSH_USER = "${params.K8S_SSH_USER ?: 'root'}"
+        K8S_TEST_NS = "${params.K8S_TEST_NS ?: 'pet-platform-test'}"
+        K8S_PROD_NS = "${params.K8S_PROD_NS ?: 'pet-platform-prod'}"
+
+        // K8s SSH 密码 (需要在 Jenkins 中配置 k8s-ssh-credential)
+        K8S_SSH_PASSWORD = credentials('k8s-ssh-credential')
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    stages {
+        // 1. 环境准备
+        stage('Checkout') {
+            steps {
+                echo 'Checkout source code...'
+                checkout scm
+            }
+        }
+
+        // 2. 后端构建 - 使用 Maven 容器
+        stage('Build Backend') {
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
+            steps {
+                echo 'Building backend with Maven 3.9 + JDK 17...'
+                dir('backend/feed-service') {
+                    sh 'mvn --version'
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        // 3. 前端构建 - 使用 Node.js 容器
+        stage('Build Frontend') {
+            when {
+                anyOf {
+                    changeset "frontend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
+                }
+            }
+            steps {
+                echo 'Building frontend with Node.js 20...'
+                dir('frontend') {
+                    sh 'node --version'
+                    sh 'npm --version'
+                    sh 'npm ci --legacy-peer-deps'
+                    sh 'npx expo export'
+                }
+            }
+        }
+
+        // 4. 单元测试
+        stage('Test Backend') {
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
+            steps {
+                echo 'Running backend tests...'
+                dir('backend/feed-service') {
+                    sh 'mvn test'
+                }
+            }
+        }
+
+        stage('Test Frontend') {
+            when {
+                anyOf {
+                    changeset "frontend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
+                }
+            }
+            steps {
+                echo 'Running frontend tests...'
+                dir('frontend') {
+                    sh 'npm test -- --passWithNoTests'
+                }
+            }
+        }
+
+        // 5. 构建并推送 Docker 镜像 (后端)
+        stage('Build & Push Backend') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            steps {
+                echo 'Building and pushing backend Docker image to ghcr.io...'
+                dir('backend/feed-service') {
+                    sh """
+                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
+
+                        docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
+                        docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
+
+                        docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
+                        docker push ${DOCKER_REGISTRY}/feed-service:latest
+
+                        docker logout ${REGISTRY_URL}
+                    """
+                }
+            }
+        }
+
+        // 6. 构建并推送 Docker 镜像 (前端)
+        stage('Build & Push Frontend') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            steps {
+                echo 'Building and pushing frontend Docker image to ghcr.io...'
+                dir('frontend') {
+                    sh """
+                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
+
+                        docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
+                        docker build -t ${DOCKER_REGISTRY}/frontend:latest .
+
+                        docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
+                        docker push ${DOCKER_REGISTRY}/frontend:latest
+
+                        docker logout ${REGISTRY_URL}
+                    """
+                }
+            }
+        }
+
+        // 7. 部署到 K8s (通过 SSH)
+        stage('Deploy to K8s') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                }
+            }
+            steps {
+                echo "Deploying to K8s via SSH (${env.BRANCH_NAME} environment)..."
+
+                script {
+                    def targetNamespace = env.BRANCH_NAME == 'main' ? "${K8S_PROD_NS}" : "${K8S_TEST_NS}"
+                    def k8sMaster = "${K8S_SSH_USER}@${K8S_MASTER_IP}"
+                    echo "Target namespace: ${targetNamespace}, K8s Master: ${k8sMaster}"
+                }
+
+                // 通过 SSH 连接到 K8s master 执行部署
+                sh """
+                    export SSHPASS="${K8S_SSH_PASSWORD}"
+                    sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
+
+                        if [ "${env.BRANCH_NAME}" = "main" ]; then
+                            NAMESPACE="${K8S_PROD_NS}"
+                            echo "Deploying to PRODUCTION: \$NAMESPACE"
+                        else
+                            NAMESPACE="${K8S_TEST_NS}"
+                            echo "Deploying to TEST: \$NAMESPACE"
+                        fi
+
+                        echo "Updating feed-service image..."
+                        kubectl set image deployment/feed-service \\
+                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
+                            -n \$NAMESPACE
+
+                        echo "Updating frontend image..."
+                        kubectl set image deployment/frontend \\
+                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
+                            -n \$NAMESPACE
+
+                        echo "Waiting for rollout..."
+                        kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
+                        kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || true
+
+                        echo "Deployment status:"
+                        kubectl get pods -n \$NAMESPACE
+                        kubectl get svc -n \$NAMESPACE
+                    '
+                """
+            }
+        }
+    }
+
+
+    post {
+        always {
+            echo 'Cleaning workspace...'
+            cleanWs()
+        }
+        success {
+            echo 'Build succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}

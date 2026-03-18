@@ -1,0 +1,29 @@
+# K8s Ingress - feed-service (可选，需要ingress-controller)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: feed-service-ingress
+  namespace: pet-platform
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  rules:
+    - host: api.pet-platform.local
+      http:
+        paths:
+          - path: /api/v1/rescue
+            pathType: Prefix
+            backend:
+              service:
+                name: feed-service
+                port:
+                  number: 8085
+          - path: /api/v1/adoption
+            pathType: Prefix
+            backend:
+              service:
+                name: feed-service
+                port:
+                  number: 8085
