@@ -48,6 +48,13 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                    reuseNode true
+                }
+            }
             steps {
                 echo 'Building backend with Maven...'
                 dir('backend/feed-service') {
@@ -65,6 +72,12 @@ pipeline {
                     branch 'main'
                     branch 'dev'
                     branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
+                    reuseNode true
                 }
             }
             steps {
@@ -88,6 +101,13 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                    reuseNode true
+                }
+            }
             steps {
                 echo 'Running backend tests...'
                 dir('backend/feed-service') {
@@ -103,6 +123,12 @@ pipeline {
                     branch 'main'
                     branch 'dev'
                     branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
+                    reuseNode true
                 }
             }
             steps {
@@ -183,12 +209,12 @@ pipeline {
                             NAMESPACE="${K8S_TEST_NS}"
                         fi
 
-                        kubectl set image deployment/feed-service \
-                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \
+                        kubectl set image deployment/feed-service \\
+                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
                             -n \$NAMESPACE
 
-                        kubectl set image deployment/frontend \
-                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \
+                        kubectl set image deployment/frontend \\
+                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
                             -n \$NAMESPACE
 
                         kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
