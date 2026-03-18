@@ -148,16 +148,26 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            environment {
+                // 代理配置，用于 Docker 镜像拉取
+                HTTP_PROXY = "${env.HTTP_PROXY ?: ''}"
+                HTTPS_PROXY = "${env.HTTP_PROXY ?: ''}"
+                http_proxy = "${env.HTTP_PROXY ?: ''}"
+                https_proxy = "${env.HTTP_PROXY ?: ''}"
+            }
             steps {
                 echo 'Building and pushing backend Docker image...'
-                dir('backend/feed-service') {
-                    sh """
-                        docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
-                        docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
-                        docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
-                        docker push ${DOCKER_REGISTRY}/feed-service:latest
-                    """
-                }
+                sh """
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTPS_PROXY}"
+                    export http_proxy="${http_proxy}"
+                    export https_proxy="${https_proxy}"
+                    cd backend/feed-service
+                    docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
+                    docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
+                    docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
+                    docker push ${DOCKER_REGISTRY}/feed-service:latest
+                """
             }
         }
 
@@ -170,16 +180,26 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            environment {
+                // 代理配置，用于 Docker 镜像拉取
+                HTTP_PROXY = "${env.HTTP_PROXY ?: ''}"
+                HTTPS_PROXY = "${env.HTTP_PROXY ?: ''}"
+                http_proxy = "${env.HTTP_PROXY ?: ''}"
+                https_proxy = "${env.HTTP_PROXY ?: ''}"
+            }
             steps {
                 echo 'Building and pushing frontend Docker image...'
-                dir('frontend') {
-                    sh """
-                        docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
-                        docker build -t ${DOCKER_REGISTRY}/frontend:latest .
-                        docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
-                        docker push ${DOCKER_REGISTRY}/frontend:latest
-                    """
-                }
+                sh """
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTPS_PROXY}"
+                    export http_proxy="${http_proxy}"
+                    export https_proxy="${https_proxy}"
+                    cd frontend
+                    docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
+                    docker build -t ${DOCKER_REGISTRY}/frontend:latest .
+                    docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
+                    docker push ${DOCKER_REGISTRY}/frontend:latest
+                """
             }
         }
 
