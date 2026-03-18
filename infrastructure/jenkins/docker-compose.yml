@@ -39,6 +39,8 @@ services:
       - http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - no_proxy=localhost,127.0.0.1,host.docker.internal
+      # GitHub Container Registry Token（用于 Docker login）
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
