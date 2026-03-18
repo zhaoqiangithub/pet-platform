@@ -5,10 +5,6 @@ pipeline {
     agent any
 
     environment {
-        // HTTP 代理配置（用于 Git/Docker/NPM 访问外网）
-        HTTP_PROXY = "${env.HTTP_PROXY_HOST ? 'http://' + env.HTTP_PROXY_HOST + ':' + env.HTTP_PROXY_PORT : ''}"
-        HTTPS_PROXY = "${env.HTTP_PROXY_HOST ? 'http://' + env.HTTP_PROXY_HOST + ':' + env.HTTP_PROXY_PORT : ''}"
-
         // GitHub Container Registry 配置
         REGISTRY_URL = 'ghcr.io'
         REGISTRY_OWNER = 'zhaoqiangithub'
@@ -154,19 +150,15 @@ pipeline {
             }
             steps {
                 echo 'Building and pushing backend Docker image...'
-                sh """
-                    export HTTP_PROXY="\${HTTP_PROXY}"
-                    export HTTPS_PROXY="\${HTTPS_PROXY}"
-                    export http_proxy="\${HTTP_PROXY}"
-                    export https_proxy="\${HTTPS_PROXY}"
-                    echo \${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u \${GITHUB_USERNAME} --password-stdin
+                sh '''
+                    echo $GITHUB_TOKEN | docker login $REGISTRY_URL -u $GITHUB_USERNAME --password-stdin
                     cd backend/feed-service
-                    docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
-                    docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
-                    docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
-                    docker push ${DOCKER_REGISTRY}/feed-service:latest
-                    docker logout ${REGISTRY_URL}
-                """
+                    docker build -t $DOCKER_REGISTRY/feed-service:$GIT_COMMIT .
+                    docker build -t $DOCKER_REGISTRY/feed-service:latest .
+                    docker push $DOCKER_REGISTRY/feed-service:$GIT_COMMIT
+                    docker push $DOCKER_REGISTRY/feed-service:latest
+                    docker logout $REGISTRY_URL
+                '''
             }
         }
 
@@ -181,19 +173,15 @@ pipeline {
             }
             steps {
                 echo 'Building and pushing frontend Docker image...'
-                sh """
-                    export HTTP_PROXY="\${HTTP_PROXY}"
-                    export HTTPS_PROXY="\${HTTPS_PROXY}"
-                    export http_proxy="\${HTTP_PROXY}"
-                    export https_proxy="\${HTTPS_PROXY}"
-                    echo \${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u \${GITHUB_USERNAME} --password-stdin
+                sh '''
+                    echo $GITHUB_TOKEN | docker login $REGISTRY_URL -u $GITHUB_USERNAME --password-stdin
                     cd frontend
-                    docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
-                    docker build -t ${DOCKER_REGISTRY}/frontend:latest .
-                    docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
-                    docker push ${DOCKER_REGISTRY}/frontend:latest
-                    docker logout ${REGISTRY_URL}
-                """
+                    docker build -t $DOCKER_REGISTRY/frontend:$GIT_COMMIT .
+                    docker build -t $DOCKER_REGISTRY/frontend:latest .
+                    docker push $DOCKER_REGISTRY/frontend:$GIT_COMMIT
+                    docker push $DOCKER_REGISTRY/frontend:latest
+                    docker logout $REGISTRY_URL
+                '''
             }
         }
 
