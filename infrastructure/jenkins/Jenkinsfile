@@ -1,127 +1,55 @@
 // Jenkins Pipeline - 宠物平台 CI/CD
 // 支持多分支构建
-// 使用 Docker Pipeline 管理工具版本
-//
-// 代理配置说明：
-// - HTTP_PROXY_HOST: 代理服务器 IP（从环境变量读取，默认留空）
-// - HTTP_PROXY_PORT: 代理服务器端口（从环境变量读取，默认留空）
-// - 如果未配置代理，相关命令可能因网络问题失败
 
 pipeline {
-    // 默认使用 Docker 容器
-    agent {
-        docker {
-            image 'maven:3.9-eclipse-temurin-17'
-            args '-v /root/.m2:/root/.m2'
-        }
-    }
+    agent any
 
     environment {
-        // 代理配置（解决网络访问问题）
-        // 从环境变量读取，如未设置则使用默认值
-        HTTP_PROXY_HOST = "${env.HTTP_PROXY_HOST ?: ''}"
-        HTTP_PROXY_PORT = "${env.HTTP_PROXY_PORT ?: ''}"
-        HTTP_PROXY = "${HTTP_PROXY}"
-        HTTPS_PROXY = "${HTTP_PROXY}"
-
         // GitHub Container Registry 配置
         REGISTRY_URL = 'ghcr.io'
         REGISTRY_OWNER = 'zhaoqiangithub'
         IMAGE_NAME = 'pet-platform'
         DOCKER_REGISTRY = "${REGISTRY_URL}/${REGISTRY_OWNER}/${IMAGE_NAME}"
 
-        // GitHub 凭证 (需要在 Jenkins 中配置 github-credential)
+        // GitHub 凭证
         GITHUB_TOKEN = credentials('github-credential')
-        // GitHub 用户名（用于 Docker login）
         GITHUB_USERNAME = 'zhaoqiangithub'
 
-        // K8s 配置 (从环境变量或默认值读取)
+        // K8s 配置
         K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
         K8S_SSH_USER = "${params.K8S_SSH_USER ?: 'root'}"
         K8S_TEST_NS = "${params.K8S_TEST_NS ?: 'pet-platform-test'}"
         K8S_PROD_NS = "${params.K8S_PROD_NS ?: 'pet-platform-prod'}"
-
-        // K8s SSH 密码 (需要在 Jenkins 中配置 k8s-ssh-credential)
         K8S_SSH_PASSWORD = credentials('k8s-ssh-credential')
     }
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         timestamps()
     }
 
     stages {
-        // 0. 配置代理（解决网络访问问题）- 必须在 Checkout 之前运行
-        stage('Config Proxy') {
-            when {
-                expression { env.HTTP_PROXY_HOST != '' }
-            }
-            steps {
-                echo 'Configuring proxy for network access...'
-                sh """
-                    export http_proxy="${HTTP_PROXY}"
-                    export https_proxy="${HTTPS_PROXY}"
-                    export HTTP_PROXY="${HTTP_PROXY}"
-                    export HTTPS_PROXY="${HTTPS_PROXY}"
-                    export no_proxy=localhost,127.0.0.1
-
-                    git config --global http.proxy "${HTTP_PROXY}"
-                    git config --global https.proxy "${HTTPS_PROXY}"
-                    git config --global http.followRedirects true
-                    git config --global https.followRedirects true
-                    git config --global http.postBuffer 524288000
-                    git config --global http.lowSpeedLimit 1000
-                    git config --global http.lowSpeedTime 60
-
-                    echo "Proxy configured: http_proxy=$http_proxy"
-                """
-            }
-        }
-
-        // 1. 环境准备
+        // 1. Checkout
         stage('Checkout') {
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
-            }
             steps {
                 echo 'Checkout source code...'
-                sh """
-                    export http_proxy="${HTTP_PROXY}"
-                    export https_proxy="${HTTP_PROXY}"
-                    export HTTP_PROXY="${HTTP_PROXY}"
-                    export HTTPS_PROXY="${HTTP_PROXY}"
-                """
                 checkout scm
             }
         }
 
-        // 2. 后端构建 - 使用 Maven 容器
+        // 2. 后端构建
         stage('Build Backend') {
-            agent {
-                docker {
-                    image 'maven:3.9-eclipse-temurin-17'
-                    args '-v /root/.m2:/root/.m2 -e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
-                    reuseNode true
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
-            }
             steps {
-                echo 'Building backend with Maven 3.9 + JDK 17...'
-                sh """
-                    export http_proxy="${HTTP_PROXY}"
-                    export https_proxy="${HTTP_PROXY}"
-                    export HTTP_PROXY="${HTTP_PROXY}"
-                    export HTTPS_PROXY="${HTTP_PROXY}"
-                """
+                echo 'Building backend with Maven...'
                 dir('backend/feed-service') {
                     sh 'mvn --version'
                     sh 'mvn clean package -DskipTests'
@@ -129,29 +57,18 @@ pipeline {
             }
         }
 
-        // 3. 前端构建 - 使用 Node.js 容器
+        // 3. 前端构建
         stage('Build Frontend') {
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
-            }
-            agent {
-                docker {
-                    image 'node:20'
-                    args '-e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
-                    reuseNode true
+            when {
+                anyOf {
+                    changeset "frontend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             steps {
-                echo 'Building frontend with Node.js 20...'
-                sh """
-                    export http_proxy="${HTTP_PROXY}"
-                    export https_proxy="${HTTP_PROXY}"
-                    export HTTP_PROXY="${HTTP_PROXY}"
-                    export HTTPS_PROXY="${HTTP_PROXY}"
-                """
+                echo 'Building frontend with Node.js...'
                 dir('frontend') {
                     sh 'node --version'
                     sh 'npm --version'
@@ -161,29 +78,18 @@ pipeline {
             }
         }
 
-        // 4. 单元测试
+        // 4. 测试
         stage('Test Backend') {
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
-            }
-            agent {
-                docker {
-                    image 'maven:3.9-eclipse-temurin-17'
-                    args '-v /root/.m2:/root/.m2 -e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
-                    reuseNode true
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             steps {
                 echo 'Running backend tests...'
-                sh """
-                    export http_proxy="${HTTP_PROXY}"
-                    export https_proxy="${HTTP_PROXY}"
-                    export HTTP_PROXY="${HTTP_PROXY}"
-                    export HTTPS_PROXY="${HTTP_PROXY}"
-                """
                 dir('backend/feed-service') {
                     sh 'mvn test'
                 }
@@ -191,27 +97,16 @@ pipeline {
         }
 
         stage('Test Frontend') {
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
-            }
-            agent {
-                docker {
-                    image 'node:20'
-                    args '-e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
-                    reuseNode true
+            when {
+                anyOf {
+                    changeset "frontend/**"
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             steps {
                 echo 'Running frontend tests...'
-                sh """
-                    export http_proxy="${HTTP_PROXY}"
-                    export https_proxy="${HTTP_PROXY}"
-                    export HTTP_PROXY="${HTTP_PROXY}"
-                    export HTTPS_PROXY="${HTTP_PROXY}"
-                """
                 dir('frontend') {
                     sh 'npm test -- --passWithNoTests'
                 }
@@ -220,30 +115,21 @@ pipeline {
 
         // 5. 构建并推送 Docker 镜像 (后端)
         stage('Build & Push Backend') {
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
             }
             steps {
-                echo 'Building and pushing backend Docker image to ghcr.io...'
+                echo 'Building and pushing backend Docker image...'
                 dir('backend/feed-service') {
                     sh """
-                        export HTTP_PROXY="${HTTP_PROXY}"
-                        export HTTPS_PROXY="${HTTP_PROXY}"
-                        export http_proxy="${HTTP_PROXY}"
-                        export https_proxy="${HTTP_PROXY}"
-
-                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_USERNAME} --password-stdin
-
                         docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
                         docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
-
                         docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
                         docker push ${DOCKER_REGISTRY}/feed-service:latest
-
-                        docker logout ${REGISTRY_URL}
                     """
                 }
             }
@@ -251,36 +137,27 @@ pipeline {
 
         // 6. 构建并推送 Docker 镜像 (前端)
         stage('Build & Push Frontend') {
-            environment {
-                HTTP_PROXY = "${HTTP_PROXY}"
-                HTTPS_PROXY = "${HTTP_PROXY}"
-                http_proxy = "${HTTP_PROXY}"
-                https_proxy = "${HTTP_PROXY}"
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
             }
             steps {
-                echo 'Building and pushing frontend Docker image to ghcr.io...'
+                echo 'Building and pushing frontend Docker image...'
                 dir('frontend') {
                     sh """
-                        export HTTP_PROXY="${HTTP_PROXY}"
-                        export HTTPS_PROXY="${HTTP_PROXY}"
-                        export http_proxy="${HTTP_PROXY}"
-                        export https_proxy="${HTTP_PROXY}"
-
-                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_USERNAME} --password-stdin
-
                         docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
                         docker build -t ${DOCKER_REGISTRY}/frontend:latest .
-
                         docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
                         docker push ${DOCKER_REGISTRY}/frontend:latest
-
-                        docker logout ${REGISTRY_URL}
                     """
                 }
             }
         }
 
-        // 7. 部署到 K8s (通过 SSH) - 仅 main/dev 分支
+        // 7. 部署到 K8s
         stage('Deploy to K8s') {
             when {
                 anyOf {
@@ -289,42 +166,34 @@ pipeline {
                 }
             }
             steps {
-                echo "Deploying to K8s via SSH (${env.BRANCH_NAME} environment)..."
+                echo "Deploying to K8s..."
 
                 script {
                     def targetNamespace = env.BRANCH_NAME == 'main' ? "${K8S_PROD_NS}" : "${K8S_TEST_NS}"
-                    def k8sMaster = "${K8S_SSH_USER}@${K8S_MASTER_IP}"
-                    echo "Target namespace: ${targetNamespace}, K8s Master: ${k8sMaster}"
+                    echo "Target namespace: ${targetNamespace}"
                 }
 
-                // 通过 SSH 连接到 K8s master 执行部署
                 sh """
                     export SSHPASS="${K8S_SSH_PASSWORD}"
                     sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 
                         if [ "${env.BRANCH_NAME}" = "main" ]; then
                             NAMESPACE="${K8S_PROD_NS}"
-                            echo "Deploying to PRODUCTION: \$NAMESPACE"
                         else
                             NAMESPACE="${K8S_TEST_NS}"
-                            echo "Deploying to TEST: \$NAMESPACE"
                         fi
 
-                        echo "Updating feed-service image..."
-                        kubectl set image deployment/feed-service \\
-                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
+                        kubectl set image deployment/feed-service \
+                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \
                             -n \$NAMESPACE
 
-                        echo "Updating frontend image..."
-                        kubectl set image deployment/frontend \\
-                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
+                        kubectl set image deployment/frontend \
+                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \
                             -n \$NAMESPACE
 
-                        echo "Waiting for rollout..."
                         kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
                         kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || true
 
-                        echo "Deployment status:"
                         kubectl get pods -n \$NAMESPACE
                         kubectl get svc -n \$NAMESPACE
                     '
@@ -332,7 +201,6 @@ pipeline {
             }
         }
     }
-
 
     post {
         always {
