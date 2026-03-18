@@ -21,8 +21,8 @@ pipeline {
         // 从环境变量读取，如未设置则使用默认值
         HTTP_PROXY_HOST = "${env.HTTP_PROXY_HOST ?: ''}"
         HTTP_PROXY_PORT = "${env.HTTP_PROXY_PORT ?: ''}"
-        HTTP_PROXY = "http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}"
-        HTTPS_PROXY = "http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}"
+        HTTP_PROXY = "${HTTP_PROXY}"
+        HTTPS_PROXY = "${HTTP_PROXY}"
 
         // GitHub Container Registry 配置
         REGISTRY_URL = 'ghcr.io'
@@ -30,8 +30,10 @@ pipeline {
         IMAGE_NAME = 'pet-platform'
         DOCKER_REGISTRY = "${REGISTRY_URL}/${REGISTRY_OWNER}/${IMAGE_NAME}"
 
-        // GitHub 凭证 (需要在 Jenkins 中配置 github-token)
+        // GitHub 凭证 (需要在 Jenkins 中配置 github-credential)
         GITHUB_TOKEN = credentials('github-credential')
+        // GitHub 用户名（用于 Docker login）
+        GITHUB_USERNAME = 'zhaoqiangithub'
 
         // K8s 配置 (从环境变量或默认值读取)
         K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
@@ -60,14 +62,14 @@ pipeline {
             steps {
                 echo 'Configuring proxy for network access...'
                 sh """
-                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTPS_PROXY}"
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTPS_PROXY}"
                     export no_proxy=localhost,127.0.0.1
 
-                    git config --global http.proxy http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    git config --global https.proxy http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    git config --global http.proxy "${HTTP_PROXY}"
+                    git config --global https.proxy "${HTTPS_PROXY}"
                     git config --global http.followRedirects true
                     git config --global https.followRedirects true
                     git config --global http.postBuffer 524288000
@@ -82,18 +84,18 @@ pipeline {
         // 1. 环境准备
         stage('Checkout') {
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             steps {
                 echo 'Checkout source code...'
-                sh """
-                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                sh '''
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTP_PROXY}"
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTP_PROXY}"
                 """
                 checkout scm
             }
@@ -109,18 +111,18 @@ pipeline {
                 }
             }
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             steps {
                 echo 'Building backend with Maven 3.9 + JDK 17...'
-                sh """
-                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                sh '''
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTP_PROXY}"
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTP_PROXY}"
                 """
                 dir('backend/feed-service') {
                     sh 'mvn --version'
@@ -132,10 +134,10 @@ pipeline {
         // 3. 前端构建 - 使用 Node.js 容器
         stage('Build Frontend') {
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             agent {
                 docker {
@@ -146,11 +148,11 @@ pipeline {
             }
             steps {
                 echo 'Building frontend with Node.js 20...'
-                sh """
-                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                sh '''
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTP_PROXY}"
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTP_PROXY}"
                 """
                 dir('frontend') {
                     sh 'node --version'
@@ -164,10 +166,10 @@ pipeline {
         // 4. 单元测试
         stage('Test Backend') {
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             agent {
                 docker {
@@ -178,11 +180,11 @@ pipeline {
             }
             steps {
                 echo 'Running backend tests...'
-                sh """
-                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                sh '''
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTP_PROXY}"
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTP_PROXY}"
                 """
                 dir('backend/feed-service') {
                     sh 'mvn test'
@@ -192,10 +194,10 @@ pipeline {
 
         stage('Test Frontend') {
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             agent {
                 docker {
@@ -206,11 +208,11 @@ pipeline {
             }
             steps {
                 echo 'Running frontend tests...'
-                sh """
-                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                sh '''
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTP_PROXY}"
+                    export HTTP_PROXY="${HTTP_PROXY}"
+                    export HTTPS_PROXY="${HTTP_PROXY}"
                 '''
                 dir('frontend') {
                     sh 'npm test -- --passWithNoTests'
@@ -221,21 +223,21 @@ pipeline {
         // 5. 构建并推送 Docker 镜像 (后端)
         stage('Build & Push Backend') {
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             steps {
                 echo 'Building and pushing backend Docker image to ghcr.io...'
                 dir('backend/feed-service') {
-                    sh """
-                        export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                        export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                        export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                        export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    sh '''
+                        export HTTP_PROXY="${HTTP_PROXY}"
+                        export HTTPS_PROXY="${HTTP_PROXY}"
+                        export http_proxy=${HTTP_PROXY}
+                        export https_proxy=${HTTP_PROXY}
 
-                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN} --password-stdin
+                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_USERNAME} --password-stdin
 
                         docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
                         docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
@@ -252,21 +254,21 @@ pipeline {
         // 6. 构建并推送 Docker 镜像 (前端)
         stage('Build & Push Frontend') {
             environment {
-                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
-                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTP_PROXY = "${HTTP_PROXY}"
+                HTTPS_PROXY = "${HTTP_PROXY}"
+                http_proxy = "${HTTP_PROXY}"
+                https_proxy = "${HTTP_PROXY}"
             }
             steps {
                 echo 'Building and pushing frontend Docker image to ghcr.io...'
                 dir('frontend') {
-                    sh """
-                        export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                        export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                        export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-                        export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    sh '''
+                        export HTTP_PROXY="${HTTP_PROXY}"
+                        export HTTPS_PROXY="${HTTP_PROXY}"
+                        export http_proxy=${HTTP_PROXY}
+                        export https_proxy=${HTTP_PROXY}
 
-                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN} --password-stdin
+                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_USERNAME} --password-stdin
 
                         docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
                         docker build -t ${DOCKER_REGISTRY}/frontend:latest .
@@ -298,7 +300,7 @@ pipeline {
                 }
 
                 // 通过 SSH 连接到 K8s master 执行部署
-                sh """
+                sh '''
                     export SSHPASS="${K8S_SSH_PASSWORD}"
                     sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 

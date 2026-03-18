@@ -70,7 +70,8 @@
       "Bash(python3:*)",
       "mcp__playwright__browser_install",
       "Bash(docker exec:*)",
-      "Bash(docker compose restart:*)"
+      "Bash(docker compose restart:*)",
+      "Bash(docker login:*)"
     ]
   }
 }
