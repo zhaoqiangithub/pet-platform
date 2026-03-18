@@ -1,0 +1,56 @@
+# K8s Deployment - feed-service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feed-service
+  namespace: pet-platform
+  labels:
+    app: feed-service
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: feed-service
+  template:
+    metadata:
+      labels:
+        app: feed-service
+        version: v1
+    spec:
+      containers:
+        - name: feed-service
+          image: pet-platform/feed-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx512m -XX:+UseG1GC"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8085
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8085
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      restartPolicy: Always

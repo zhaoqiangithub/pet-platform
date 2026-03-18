@@ -1,0 +1,34 @@
+# K8s Service - feed-service
+apiVersion: v1
+kind: Service
+metadata:
+  name: feed-service
+  namespace: pet-platform
+  labels:
+    app: feed-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8085
+      targetPort: 8085
+      protocol: TCP
+      name: http
+  selector:
+    app: feed-service
+---
+# Headless Service (for Feign client)
+apiVersion: v1
+kind: Service
+metadata:
+  name: feed-service-headless
+  namespace: pet-platform
+  labels:
+    app: feed-service
+spec:
+  clusterIP: None
+  ports:
+    - port: 8085
+      targetPort: 8085
+      protocol: TCP
+  selector:
+    app: feed-service
