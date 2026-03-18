@@ -33,6 +33,61 @@ PetPal是一个跨平台宠物服务平台，支持Web、iOS、Android三端。�
 - pnpm (前端包管理)
 - Maven (后端构建)
 
+## Claude Code 最佳实践
+
+### MCP (Model Context Protocol) 扩展
+
+项目已配置以下 MCP 服务：
+
+#### Playwright - 浏览器自动化
+```bash
+# 已配置（通过 npx @playwright/mcp@latest）
+# 用于 E2E 测试、页面交互验证
+claude mcp list  # 查看 MCP 状态
+```
+
+**使用场景**：
+- E2E 测试：自动打开浏览器执行用户操作
+- 页面验证：检查元素存在性、点击按钮、填写表单
+- 视觉回归测试：截图对比 UI 变化
+
+**使用示例**：
+```
+使用 Playwright 打开 http://localhost:8080 并验证页面包含 "Jenkins" 文字
+```
+
+#### 添加新的 MCP
+```bash
+# 添加 MCP 服务
+claude mcp add <name> <command>
+
+# 示例：添加 Puppeteer
+claude mcp add puppeteer npx @puppeteer/mcp
+
+# 示例：添加 GitHub
+claude mcp add github github.com/github/copilot-mcp-game
+```
+
+### CLI 命令技巧
+
+```bash
+# 使用 /help 获取帮助
+/help
+
+# 使用 /skills 查看可用技能
+/skills
+
+# 使用 /mcp 查看 MCP 信息
+/mcp
+```
+
+### 对话技巧
+
+1. **明确任务**：尽量详细描述需求，包括期望的结果
+2. **提供上下文**：可以引用文件（如 `@./docs/requirements/`）
+3. **分步执行**：复杂任务分成多个小步骤
+4. **检查结果**：重要操作后验证结果
+
 ## 常用命令（在根目录执行）
 ```bash
 # 前端开发
@@ -111,73 +166,11 @@ AI在生成或更新Docker/K8s配置后，必须自动执行以下验证：
 
 **规则**：PR前只验证“配置是否正确”，PR后验证“部署是否能运行”。
 
-引用文档：`@./k8s/CLAUDE.md` 提供详细K8s配置规则。
+引用文档：`@./k8s/CLAUDE.md` 提供详细K8s配置规则，`@./infrastructure/CLAUDE.md` 提供详细基础设施配置规则。
 
 ## 基础设施部署
 
-### 目录结构
-```
-infrastructure/
-├── jenkins/           # CI/CD 服务
-│   ├── docker-compose.yml
-│   ├── install.sh
-│   ├── k8s/
-│   │   └── deployment.yaml
-│   └── Jenkinsfile    # CI/CD Pipeline 模板
-├── harbor/            # 私有镜像仓库
-│   ├── docker-compose.yml
-│   ├── harbor.yml
-│   ├── harbor.env
-│   ├── nginx.conf
-│   ├── install.sh
-│   ├── generate-certs.sh
-│   └── k8s/
-│       └── deployment.yaml
-└── README.md
-```
-
-### 快速启动（开发环境）
-
-```bash
-# 1. 安装 Harbor
-cd infrastructure/harbor
-chmod +x install.sh generate-certs.sh
-./install.sh
-
-# 2. 安装 Jenkins
-cd infrastructure/jenkins
-chmod +x install.sh
-./install.sh
-```
-
-### 依赖版本（与项目一致）
-
-| 组件 | 版本 | 说明 |
-|------|------|------|
-| Jenkins | 2.446.1-lts | 稳定版 |
-| Harbor | 2.10.0 | 稳定版 |
-| JDK | 17 | 与项目一致 |
-
-### CI/CD 流程
-1. 代码 push → GitHub
-2. Jenkins 自动构建 (单元测试 + 打包)
-3. 构建 Docker 镜像
-4. 推送到 Harbor
-5. 部署到 K8s (可选)
-
-### 常用命令
-
-```bash
-# Harbor
-cd infrastructure/harbor
-docker compose up -d      # 启动
-docker compose down       # 停止
-
-# Jenkins
-cd infrastructure/jenkins
-docker compose up -d      # 启动
-docker compose logs -f   # 查看日志
-```
+本模块配置已迁移至 [infrastructure/CLAUDE.md](./infrastructure/CLAUDE.md)
 
 ## 代码质量
 前端：必须通过跨平台测试（iOS/Android/Web），使用Platform.select处理差异。

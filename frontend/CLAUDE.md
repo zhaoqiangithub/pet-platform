@@ -15,10 +15,12 @@
 - **测试框架**：
   - 单元/集成测试：Jest + React Native Testing Library
   - API Mock：MSW（Mock Service Worker）
-  - E2E测试（Web）：Playwright
+  - E2E测试（Web）：Playwright + Claude MCP
   - E2E测试（移动端）：Detox
   - 视觉验证：ClaudeWatch
   - 类型检查：TypeScript（`tsc --noEmit`）
+
+> **提示**：已配置 `Playwright MCP`（`npx @playwright/mcp@latest`），可直接在对话中使用自然语言控制浏览器进行测试。
 
 ## 界面风格指南
 详见 `@./UI-GUIDE.md`
