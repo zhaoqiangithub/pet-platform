@@ -38,6 +38,17 @@ pipeline {
     }
 
     stages {
+        // 0. 配置代理（解决网络访问问题）
+        stage('Config Proxy') {
+            steps {
+                echo 'Configuring proxy for network access...'
+                sh '''
+                    git config --global http.proxy http://192.168.31.139:7890
+                    git config --global https.proxy http://192.168.31.139:7890
+                '''
+            }
+        }
+
         // 1. 环境准备
         stage('Checkout') {
             steps {
