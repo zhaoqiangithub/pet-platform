@@ -13,13 +13,23 @@ pipeline {
     }
 
     environment {
-        // Harbor 配置
-        HARBOR_URL = 'harbor.local'
-        HARBOR_PROJECT = 'pet-platform'
-        DOCKER_REGISTRY = 'harbor.local/pet-platform'
+        // GitHub Container Registry 配置
+        REGISTRY_URL = 'ghcr.io'
+        REGISTRY_OWNER = 'zhaoqiangithub'
+        IMAGE_NAME = 'pet-platform'
+        DOCKER_REGISTRY = "${REGISTRY_URL}/${REGISTRY_OWNER}/${IMAGE_NAME}"
 
-        // 凭证 ID (需要在 Jenkins 中配置)
-        HARBOR_CREDENTIALS = credentials('harbor-credential')
+        // GitHub 凭证 (需要在 Jenkins 中配置 github-token)
+        GITHUB_TOKEN = credentials('github-token')
+
+        // K8s 配置 (从环境变量或默认值读取)
+        K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
+        K8S_SSH_USER = "${params.K8S_SSH_USER ?: 'root'}"
+        K8S_TEST_NS = "${params.K8S_TEST_NS ?: 'pet-platform-test'}"
+        K8S_PROD_NS = "${params.K8S_PROD_NS ?: 'pet-platform-prod'}"
+
+        // K8s SSH 密码 (需要在 Jenkins 中配置 k8s-ssh-credential)
+        K8S_SSH_PASSWORD = credentials('k8s-ssh-credential')
     }
 
     options {
@@ -43,7 +53,8 @@ pipeline {
                 anyOf {
                     changeset "backend/**"
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             agent {
@@ -67,7 +78,8 @@ pipeline {
                 anyOf {
                     changeset "frontend/**"
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             agent {
@@ -92,7 +104,8 @@ pipeline {
                 anyOf {
                     changeset "backend/**"
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             agent {
@@ -114,7 +127,8 @@ pipeline {
                 anyOf {
                     changeset "frontend/**"
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             agent {
@@ -130,89 +144,108 @@ pipeline {
             }
         }
 
-        // 5. 构建 Docker 镜像
-        stage('Docker Build Backend') {
+        // 5. 构建并推送 Docker 镜像 (后端)
+        stage('Build & Push Backend') {
             when {
                 anyOf {
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             steps {
-                echo 'Building backend Docker image...'
+                echo 'Building and pushing backend Docker image to ghcr.io...'
                 dir('backend/feed-service') {
                     sh """
+                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
+
                         docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
                         docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
+
+                        docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
+                        docker push ${DOCKER_REGISTRY}/feed-service:latest
+
+                        docker logout ${REGISTRY_URL}
                     """
                 }
             }
         }
 
-        stage('Docker Build Frontend') {
+        // 6. 构建并推送 Docker 镜像 (前端)
+        stage('Build & Push Frontend') {
             when {
                 anyOf {
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
+                    branch 'feature/**'
                 }
             }
             steps {
-                echo 'Building frontend Docker image...'
+                echo 'Building and pushing frontend Docker image to ghcr.io...'
                 dir('frontend') {
                     sh """
+                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
+
                         docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
                         docker build -t ${DOCKER_REGISTRY}/frontend:latest .
+
+                        docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
+                        docker push ${DOCKER_REGISTRY}/frontend:latest
+
+                        docker logout ${REGISTRY_URL}
                     """
                 }
             }
         }
 
-        // 6. 推送镜像到 Harbor
-        stage('Push to Harbor') {
+        // 7. 部署到 K8s (通过 SSH)
+        stage('Deploy to K8s') {
             when {
                 anyOf {
                     branch 'main'
-                    branch 'develop'
+                    branch 'dev'
                 }
             }
             steps {
-                echo 'Pushing to Harbor...'
+                echo "Deploying to K8s via SSH (${env.BRANCH_NAME} environment)..."
 
-                // 登录 Harbor
+                script {
+                    def targetNamespace = env.BRANCH_NAME == 'main' ? "${K8S_PROD_NS}" : "${K8S_TEST_NS}"
+                    def k8sMaster = "${K8S_SSH_USER}@${K8S_MASTER_IP}"
+                    echo "Target namespace: ${targetNamespace}, K8s Master: ${k8sMaster}"
+                }
+
+                // 通过 SSH 连接到 K8s master 执行部署
                 sh """
-                    docker login ${HARBOR_URL} -u ${HARBOR_CREDENTIALS_USR} -p ${HARBOR_CREDENTIALS_PSW}
-                """
+                    export SSHPASS="${K8S_SSH_PASSWORD}"
+                    sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 
-                // 推送镜像
-                sh """
-                    docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
-                    docker push ${DOCKER_REGISTRY}/feed-service:latest
-                    docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
-                    docker push ${DOCKER_REGISTRY}/frontend:latest
-                """
+                        if [ "${env.BRANCH_NAME}" = "main" ]; then
+                            NAMESPACE="${K8S_PROD_NS}"
+                            echo "Deploying to PRODUCTION: \$NAMESPACE"
+                        else
+                            NAMESPACE="${K8S_TEST_NS}"
+                            echo "Deploying to TEST: \$NAMESPACE"
+                        fi
 
-                // 退出登录
-                sh 'docker logout'
-            }
-        }
+                        echo "Updating feed-service image..."
+                        kubectl set image deployment/feed-service \\
+                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
+                            -n \$NAMESPACE
 
-        // 7. 部署到 K8s (仅 main 分支)
-        stage('Deploy to K8s') {
-            when {
-                branch 'main'
-            }
-            steps {
-                echo 'Deploying to K8s...'
+                        echo "Updating frontend image..."
+                        kubectl set image deployment/frontend \\
+                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
+                            -n \$NAMESPACE
 
-                sh """
-                    # 更新 K8s Deployment 镜像版本
-                    kubectl set image deployment/feed-service \
-                        feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \
-                        -n pet-platform
+                        echo "Waiting for rollout..."
+                        kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
+                        kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || true
 
-                    kubectl set image deployment/frontend \
-                        frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \
-                        -n pet-platform
+                        echo "Deployment status:"
+                        kubectl get pods -n \$NAMESPACE
+                        kubectl get svc -n \$NAMESPACE
+                    '
                 """
             }
         }

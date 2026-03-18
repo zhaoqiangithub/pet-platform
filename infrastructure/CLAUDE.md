@@ -202,20 +202,108 @@ chmod +x deploy.sh test-jenkins.sh
 
 ```
 代码 push → GitHub → Jenkins 自动构建 → 单元测试 + 打包
-    → 构建 Docker 镜像 → 推送到 Docker Registry → 部署到 K8s
+    → 构建 Docker 镜像 → 推送到 ghcr.io → 部署到 K8s
+```
+
+### GitHub Container Registry (ghcr.io)
+
+项目使用 GitHub Container Registry 存储 Docker 镜像。
+
+#### 镜像命名规范
+
+```
+ghcr.io/{owner}/pet-platform/{service}:{tag}
+```
+
+示例：
+- 后端：`ghcr.io/zhaoqiang/pet-platform/feed-service:latest`
+- 前端：`ghcr.io/zhaoqiang/pet-platform/frontend:latest`
+
+#### 认证配置
+
+1. 在 GitHub 创建 Personal Access Token：
+   - 访问 https://github.com/settings/tokens
+   - 创建 Classic Token，勾选 `write:packages` 和 `read:packages`
+
+2. 在 Jenkins 添加凭据：
+   - 类型：Secret text
+   - ID：`github-token`
+   - Secret：Token 值
+
+#### K8s 拉取镜像
+
+在 K8s 集群中创建 Image Pull Secret：
+
+```bash
+kubectl create secret docker-registry ghcr-io-secret \
+  --docker-server=ghcr.io \
+  --docker-username={your-github-username} \
+  --docker-password={your-github-token} \
+  --docker-email=your@email.com \
+  -n pet-platform
+```
+
+在 Deployment 中引用：
+
+```yaml
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: ghcr-io-secret
+      containers:
+        - name: feed-service
+          image: ghcr.io/zhaoqiang/pet-platform/feed-service:latest
+          imagePullPolicy: Always
 ```
 
 ### Jenkins Pipeline 模板
 
 项目提供了 `Jenkinsfile` 模板，位于 `infrastructure/jenkins/Jenkinsfile`。
 
-典型 Pipeline 流程：
-1. **Checkout**: 从 GitHub 拉取代码
-2. **Build**: 编译后端服务 / 前端 Web
-3. **Test**: 运行单元测试
-4. **Docker Build**: 构建 Docker 镜像
-5. **Push**: 推送到私有镜像仓库
-6. **Deploy**: 部署到 K8s（可选）
+#### Pipeline 流程
+
+```
+Git Push → Checkout → Build → Test → Docker Build → Push to ghcr.io → Deploy to K8s
+```
+
+#### 分支策略
+
+| 分支 | 构建 | 测试 | 镜像推送 | K8s 部署 | 目标环境 |
+|------|------|------|----------|----------|----------|
+| `dev` | ✅ | ✅ | ✅ | ✅ | pet-platform-test |
+| `main` | ✅ | ✅ | ✅ | ✅ | pet-platform-prod |
+| `feature/**` | ✅ | ✅ | ✅ | ❌ | 不部署 |
+
+#### 环境配置
+
+配置文件：`infrastructure/.env`
+
+```bash
+# GitHub Container Registry
+GITHUB_REGISTRY=ghcr.io
+GITHUB_OWNER=zhaoqiangithub
+GITHUB_TOKEN=<your-github-token>
+
+# K8s 集群
+K8S_MASTER_IP=100.89.107.21
+K8S_SSH_USER=root
+K8S_TEST_NAMESPACE=pet-platform-test
+K8S_PROD_NAMESPACE=pet-platform-prod
+```
+
+#### K8s 部署流程
+
+1. Jenkins 通过 SSH 连接到 K8s master (100.89.107.21)
+2. 执行 `kubectl set image` 更新 Deployment
+3. 执行 `kubectl rollout status` 等待滚动更新完成
+
+#### K8s 命名空间
+
+| 命名空间 | 用途 |
+|----------|------|
+| `pet-platform-test` | 测试环境 (dev 分支部署) |
+| `pet-platform-prod` | 生产环境 (main 分支部署) |
 
 ## 常用命令
 
