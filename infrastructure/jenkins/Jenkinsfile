@@ -159,11 +159,13 @@ pipeline {
                     export HTTPS_PROXY="\${HTTPS_PROXY}"
                     export http_proxy="\${HTTP_PROXY}"
                     export https_proxy="\${HTTPS_PROXY}"
+                    echo \${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u \${GITHUB_USERNAME} --password-stdin
                     cd backend/feed-service
                     docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
                     docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
                     docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
                     docker push ${DOCKER_REGISTRY}/feed-service:latest
+                    docker logout ${REGISTRY_URL}
                 """
             }
         }
@@ -184,11 +186,13 @@ pipeline {
                     export HTTPS_PROXY="\${HTTPS_PROXY}"
                     export http_proxy="\${HTTP_PROXY}"
                     export https_proxy="\${HTTPS_PROXY}"
+                    echo \${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u \${GITHUB_USERNAME} --password-stdin
                     cd frontend
                     docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
                     docker build -t ${DOCKER_REGISTRY}/frontend:latest .
                     docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
                     docker push ${DOCKER_REGISTRY}/frontend:latest
+                    docker logout ${REGISTRY_URL}
                 """
             }
         }
