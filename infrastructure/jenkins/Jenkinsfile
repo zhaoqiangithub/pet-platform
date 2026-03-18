@@ -49,8 +49,6 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 30, unit: 'MINUTES')
         timestamps()
-        // 全局 git 超时配置
-        gitConfigGlobal("http.postBuffer 524288000")
     }
 
     stages {
