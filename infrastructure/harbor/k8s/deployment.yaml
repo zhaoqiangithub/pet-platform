@@ -1,0 +1,40 @@
+# K8s Deployment - Harbor
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbor
+  namespace: infrastructure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: harbor
+  template:
+    metadata:
+      labels:
+        app: harbor
+    spec:
+      containers:
+        - name: harbor-portal
+          image: goharbor/portal:v2.10.0
+          ports:
+            - containerPort: 80
+        - name: harbor-core
+          image: goharbor/core:v2.10.0
+          ports:
+            - containerPort: 8080
+        - name: harbor-registry
+          image: goharbor/registry:v2.10.0
+          ports:
+            - containerPort: 5000
+        - name: harbor-db
+          image: goharbor/harbor-db:v2.10.0
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              value: root123
+        - name: harbor-redis
+          image: goharbor/redis:v2.10.0
+          ports:
+            - containerPort: 6379

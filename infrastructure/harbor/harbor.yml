@@ -1,0 +1,46 @@
+# Harbor 配置文件
+# Harbor 2.10.0
+
+# Harbor 服务配置
+hostname: harbor.local
+http:
+  port: 80
+https:
+  port: 443
+  certificate: ./certs/server.crt
+  private_key: ./certs/server.key
+
+# Harbor 管理后台
+harbor_admin_password: Harbor12345
+
+# 数据库配置
+database:
+  password: root123
+  max_idle_conns: 50
+  max_open_conns: 100
+
+# Redis 配置
+redis:
+  password:
+
+# 数据存储配置
+storage_service:
+  # 存储驱动: filesystem, s3, azure, gcs, swift, oss
+  filesystem:
+    rootdirectory: /var/lib/registry
+    maxthreads: 100
+
+# 清理策略
+jobservice:
+  max_job_workers: 10
+
+# 日志配置
+log:
+  level: info
+  local:
+    rotate_count: 50
+    rotate_size: 200M
+    location: /var/log/harbor
+
+# 版本
+version: 2.10.0

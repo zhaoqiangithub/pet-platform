@@ -1,0 +1,33 @@
+# Jenkins Docker Compose - CI/CD
+# 版本: 2.446.1-lts
+# 用途: 开发/测试环境
+
+version: '3.8'
+
+services:
+  jenkins:
+    image: jenkins/jenkins:2.446.1-lts
+    container_name: pet-jenkins
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  jenkins_home:
+    driver: local

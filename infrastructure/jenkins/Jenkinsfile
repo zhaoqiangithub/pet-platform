@@ -1,0 +1,233 @@
+// Jenkins Pipeline - 宠物平台 CI/CD
+// 支持多分支构建
+// 使用 Docker Pipeline 管理工具版本
+
+pipeline {
+    // 默认使用 Docker 容器
+    agent {
+        docker {
+            image 'maven:3.9-eclipse-temurin-17'
+            label 'docker'
+            args '-v /root/.m2:/root/.m2'
+        }
+    }
+
+    environment {
+        // Harbor 配置
+        HARBOR_URL = 'harbor.local'
+        HARBOR_PROJECT = 'pet-platform'
+        DOCKER_REGISTRY = 'harbor.local/pet-platform'
+
+        // 凭证 ID (需要在 Jenkins 中配置)
+        HARBOR_CREDENTIALS = credentials('harbor-credential')
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    stages {
+        // 1. 环境准备
+        stage('Checkout') {
+            steps {
+                echo 'Checkout source code...'
+                checkout scm
+            }
+        }
+
+        // 2. 后端构建 - 使用 Maven 容器
+        stage('Build Backend') {
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
+            steps {
+                echo 'Building backend with Maven 3.9 + JDK 17...'
+                dir('backend/feed-service') {
+                    sh 'mvn --version'
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        // 3. 前端构建 - 使用 Node.js 容器
+        stage('Build Frontend') {
+            when {
+                anyOf {
+                    changeset "frontend/**"
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
+                }
+            }
+            steps {
+                echo 'Building frontend with Node.js 20...'
+                dir('frontend') {
+                    sh 'node --version'
+                    sh 'npm --version'
+                    sh 'npm ci --legacy-peer-deps'
+                    sh 'npx expo export'
+                }
+            }
+        }
+
+        // 4. 单元测试
+        stage('Test Backend') {
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
+            steps {
+                echo 'Running backend tests...'
+                dir('backend/feed-service') {
+                    sh 'mvn test'
+                }
+            }
+        }
+
+        stage('Test Frontend') {
+            when {
+                anyOf {
+                    changeset "frontend/**"
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
+                }
+            }
+            steps {
+                echo 'Running frontend tests...'
+                dir('frontend') {
+                    sh 'npm test -- --passWithNoTests'
+                }
+            }
+        }
+
+        // 5. 构建 Docker 镜像
+        stage('Docker Build Backend') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                echo 'Building backend Docker image...'
+                dir('backend/feed-service') {
+                    sh """
+                        docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
+                        docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
+                    """
+                }
+            }
+        }
+
+        stage('Docker Build Frontend') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                echo 'Building frontend Docker image...'
+                dir('frontend') {
+                    sh """
+                        docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
+                        docker build -t ${DOCKER_REGISTRY}/frontend:latest .
+                    """
+                }
+            }
+        }
+
+        // 6. 推送镜像到 Harbor
+        stage('Push to Harbor') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                echo 'Pushing to Harbor...'
+
+                // 登录 Harbor
+                sh """
+                    docker login ${HARBOR_URL} -u ${HARBOR_CREDENTIALS_USR} -p ${HARBOR_CREDENTIALS_PSW}
+                """
+
+                // 推送镜像
+                sh """
+                    docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
+                    docker push ${DOCKER_REGISTRY}/feed-service:latest
+                    docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
+                    docker push ${DOCKER_REGISTRY}/frontend:latest
+                """
+
+                // 退出登录
+                sh 'docker logout'
+            }
+        }
+
+        // 7. 部署到 K8s (仅 main 分支)
+        stage('Deploy to K8s') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo 'Deploying to K8s...'
+
+                sh """
+                    # 更新 K8s Deployment 镜像版本
+                    kubectl set image deployment/feed-service \
+                        feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \
+                        -n pet-platform
+
+                    kubectl set image deployment/frontend \
+                        frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \
+                        -n pet-platform
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning workspace...'
+            cleanWs()
+        }
+        success {
+            echo 'Build succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}

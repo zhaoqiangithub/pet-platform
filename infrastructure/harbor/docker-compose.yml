@@ -1,0 +1,131 @@
+# Harbor Docker Compose - 私有镜像仓库
+# 版本: 2.10.0
+# 用途: 开发/测试环境
+
+version: '3.8'
+
+services:
+  # Harbor Portal (Web UI)
+  portal:
+    image: goharbor/portal:v2.10.0
+    container_name: harbor-portal
+    networks:
+      - harbor
+    restart: always
+
+  # Harbor Core API
+  core:
+    image: goharbor/core:v2.10.0
+    container_name: harbor-core
+    env_file:
+      - ./harbor.env
+    volumes:
+      - /data/ca_download:/ca_download
+      - /data/registry:/registry
+      - /data/chart_storage:/chart_storage
+      - /data/jobservice:/jobservice
+      - /data/redis:/redis
+      - /data/trust_cert:/root/.docker
+    networks:
+      - harbor
+    restart: always
+    depends_on:
+      - portal
+      - registry
+      - redis
+
+  # Docker Registry
+  registry:
+    image: goharbor/registry:v2.10.0
+    container_name: harbor-registry
+    volumes:
+      - /data/registry:/var/lib/registry
+      - ./certs:/etc/registry/certs
+    env_file:
+      - ./harbor.env
+    networks:
+      - harbor
+    restart: always
+
+  # Harbor Registry Controller
+  registryctl:
+    image: goharbor/registryctl:v2.10.0
+    container_name: harbor-registryctl
+    env_file:
+      - ./harbor.env
+    volumes:
+      - /data/registry:/var/lib/registry
+      - /data/chart_storage:/chart_storage
+    networks:
+      - harbor
+    restart: always
+
+  # Redis Cache
+  redis:
+    image: goharbor/redis:v2.10.0
+    container_name: harbor-redis
+    volumes:
+      - /data/redis:/data
+    networks:
+      - harbor
+    restart: always
+
+  # Harbor Jobservice
+  jobservice:
+    image: goharbor/jobservice:v2.10.0
+    container_name: harbor-jobservice
+    env_file:
+      - ./harbor.env
+    volumes:
+      - /data/jobservice:/var/log/jobservice
+      - /data/secret_keys:/keys
+    networks:
+      - harbor
+    restart: always
+    depends_on:
+      - redis
+
+  # Harbor Nginx (Reverse Proxy)
+  nginx:
+    image: goharbor/nginx:v2.10.0
+    container_name: harbor-nginx
+    volumes:
+      - ./certs:/etc/nginx/certs
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - harbor
+    restart: always
+    depends_on:
+      - core
+
+  # Harbor Database (PostgreSQL)
+  harbor-db:
+    image: goharbor/harbor-db:v2.10.0
+    container_name: harbor-db
+    volumes:
+      - /data/database:/var/lib/postgresql/data
+    env_file:
+      - ./harbor.env
+    networks:
+      - harbor
+    restart: always
+    shm_size: '512m'
+
+networks:
+  harbor:
+    name: harbor-network
+
+volumes:
+  /data:
+    driver: local
+  /data/ca_download:
+  /data/registry:
+  /data/chart_storage:
+  /data/jobservice:
+  /data/redis:
+  /data/trust_cert:
+  /data/secret_keys:
+  /data/database:

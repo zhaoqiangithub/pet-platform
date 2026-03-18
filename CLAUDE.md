@@ -24,6 +24,7 @@ PetPal是一个跨平台宠物服务平台，支持Web、iOS、Android三端。�
 | 网关       | `/backend/gateway-service/`      | Spring Cloud Gateway    | `GatewayApplication.java`         |
 | 文档       | `/docs/`                         | Markdown + OpenAPI      | `api-contracts/`, `requirements/` |
 | K8s配置    | `/k8s/`                          | YAML                    | `deployments/`, `services/`       |
+| 基础设施   | `/infrastructure/`               | Docker + K8s            | `jenkins/`, `harbor/`            |
 
 ## 开发环境要求
 - Node.js 20+ (前端)
@@ -111,6 +112,72 @@ AI在生成或更新Docker/K8s配置后，必须自动执行以下验证：
 **规则**：PR前只验证“配置是否正确”，PR后验证“部署是否能运行”。
 
 引用文档：`@./k8s/CLAUDE.md` 提供详细K8s配置规则。
+
+## 基础设施部署
+
+### 目录结构
+```
+infrastructure/
+├── jenkins/           # CI/CD 服务
+│   ├── docker-compose.yml
+│   ├── install.sh
+│   ├── k8s/
+│   │   └── deployment.yaml
+│   └── Jenkinsfile    # CI/CD Pipeline 模板
+├── harbor/            # 私有镜像仓库
+│   ├── docker-compose.yml
+│   ├── harbor.yml
+│   ├── harbor.env
+│   ├── nginx.conf
+│   ├── install.sh
+│   ├── generate-certs.sh
+│   └── k8s/
+│       └── deployment.yaml
+└── README.md
+```
+
+### 快速启动（开发环境）
+
+```bash
+# 1. 安装 Harbor
+cd infrastructure/harbor
+chmod +x install.sh generate-certs.sh
+./install.sh
+
+# 2. 安装 Jenkins
+cd infrastructure/jenkins
+chmod +x install.sh
+./install.sh
+```
+
+### 依赖版本（与项目一致）
+
+| 组件 | 版本 | 说明 |
+|------|------|------|
+| Jenkins | 2.446.1-lts | 稳定版 |
+| Harbor | 2.10.0 | 稳定版 |
+| JDK | 17 | 与项目一致 |
+
+### CI/CD 流程
+1. 代码 push → GitHub
+2. Jenkins 自动构建 (单元测试 + 打包)
+3. 构建 Docker 镜像
+4. 推送到 Harbor
+5. 部署到 K8s (可选)
+
+### 常用命令
+
+```bash
+# Harbor
+cd infrastructure/harbor
+docker compose up -d      # 启动
+docker compose down       # 停止
+
+# Jenkins
+cd infrastructure/jenkins
+docker compose up -d      # 启动
+docker compose logs -f   # 查看日志
+```
 
 ## 代码质量
 前端：必须通过跨平台测试（iOS/Android/Web），使用Platform.select处理差异。
