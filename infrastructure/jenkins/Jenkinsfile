@@ -5,6 +5,10 @@ pipeline {
     agent any
 
     environment {
+        // HTTP 代理配置（用于 Git/Docker/NPM 访问外网）
+        HTTP_PROXY = "${env.HTTP_PROXY_HOST ? 'http://' + env.HTTP_PROXY_HOST + ':' + env.HTTP_PROXY_PORT : ''}"
+        HTTPS_PROXY = "${env.HTTP_PROXY_HOST ? 'http://' + env.HTTP_PROXY_HOST + ':' + env.HTTP_PROXY_PORT : ''}"
+
         // GitHub Container Registry 配置
         REGISTRY_URL = 'ghcr.io'
         REGISTRY_OWNER = 'zhaoqiangithub'
@@ -148,20 +152,13 @@ pipeline {
                     branch 'feature/**'
                 }
             }
-            environment {
-                // 代理配置，用于 Docker 镜像拉取
-                HTTP_PROXY = "${env.HTTP_PROXY ?: ''}"
-                HTTPS_PROXY = "${env.HTTP_PROXY ?: ''}"
-                http_proxy = "${env.HTTP_PROXY ?: ''}"
-                https_proxy = "${env.HTTP_PROXY ?: ''}"
-            }
             steps {
                 echo 'Building and pushing backend Docker image...'
                 sh """
                     export HTTP_PROXY="${HTTP_PROXY}"
                     export HTTPS_PROXY="${HTTPS_PROXY}"
-                    export http_proxy="${http_proxy}"
-                    export https_proxy="${https_proxy}"
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTPS_PROXY}"
                     cd backend/feed-service
                     docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
                     docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
@@ -180,20 +177,13 @@ pipeline {
                     branch 'feature/**'
                 }
             }
-            environment {
-                // 代理配置，用于 Docker 镜像拉取
-                HTTP_PROXY = "${env.HTTP_PROXY ?: ''}"
-                HTTPS_PROXY = "${env.HTTP_PROXY ?: ''}"
-                http_proxy = "${env.HTTP_PROXY ?: ''}"
-                https_proxy = "${env.HTTP_PROXY ?: ''}"
-            }
             steps {
                 echo 'Building and pushing frontend Docker image...'
                 sh """
                     export HTTP_PROXY="${HTTP_PROXY}"
                     export HTTPS_PROXY="${HTTPS_PROXY}"
-                    export http_proxy="${http_proxy}"
-                    export https_proxy="${https_proxy}"
+                    export http_proxy="${HTTP_PROXY}"
+                    export https_proxy="${HTTPS_PROXY}"
                     cd frontend
                     docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
                     docker build -t ${DOCKER_REGISTRY}/frontend:latest .
