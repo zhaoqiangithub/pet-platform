@@ -300,7 +300,7 @@ pipeline {
                 }
 
                 // 通过 SSH 连接到 K8s master 执行部署
-                sh '''
+                sh """
                     export SSHPASS="${K8S_SSH_PASSWORD}"
                     sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 
