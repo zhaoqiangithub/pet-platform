@@ -13,7 +13,9 @@
       "Bash(pnpm:*)",
       "Bash(git push:*)",
       "Bash(gh pr create:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(brew install:*)",
+      "Bash(kubeconform:*)"
     ]
   }
 }
