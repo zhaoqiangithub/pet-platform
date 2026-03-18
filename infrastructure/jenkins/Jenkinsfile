@@ -59,14 +59,6 @@ pipeline {
 
         // 2. 后端构建 - 使用 Maven 容器
         stage('Build Backend') {
-            when {
-                anyOf {
-                    changeset "backend/**"
-                    branch 'main'
-                    branch 'dev'
-                    branch 'feature/**'
-                }
-            }
             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
@@ -84,14 +76,6 @@ pipeline {
 
         // 3. 前端构建 - 使用 Node.js 容器
         stage('Build Frontend') {
-            when {
-                anyOf {
-                    changeset "frontend/**"
-                    branch 'main'
-                    branch 'dev'
-                    branch 'feature/**'
-                }
-            }
             agent {
                 docker {
                     image 'node:20'
@@ -110,14 +94,6 @@ pipeline {
 
         // 4. 单元测试
         stage('Test Backend') {
-            when {
-                anyOf {
-                    changeset "backend/**"
-                    branch 'main'
-                    branch 'dev'
-                    branch 'feature/**'
-                }
-            }
             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
@@ -133,14 +109,6 @@ pipeline {
         }
 
         stage('Test Frontend') {
-            when {
-                anyOf {
-                    changeset "frontend/**"
-                    branch 'main'
-                    branch 'dev'
-                    branch 'feature/**'
-                }
-            }
             agent {
                 docker {
                     image 'node:20'
@@ -156,13 +124,6 @@ pipeline {
 
         // 5. 构建并推送 Docker 镜像 (后端)
         stage('Build & Push Backend') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    branch 'feature/**'
-                }
-            }
             steps {
                 echo 'Building and pushing backend Docker image to ghcr.io...'
                 dir('backend/feed-service') {
@@ -183,13 +144,6 @@ pipeline {
 
         // 6. 构建并推送 Docker 镜像 (前端)
         stage('Build & Push Frontend') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    branch 'feature/**'
-                }
-            }
             steps {
                 echo 'Building and pushing frontend Docker image to ghcr.io...'
                 dir('frontend') {
@@ -208,7 +162,7 @@ pipeline {
             }
         }
 
-        // 7. 部署到 K8s (通过 SSH)
+        // 7. 部署到 K8s (通过 SSH) - 仅 main/dev 分支
         stage('Deploy to K8s') {
             when {
                 anyOf {
