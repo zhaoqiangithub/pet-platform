@@ -42,21 +42,34 @@ pipeline {
     }
 
     stages {
-        // 0. 配置代理（解决网络访问问题）
+        // 0. 配置代理（解决网络访问问题）- 必须在 Checkout 之前运行
         stage('Config Proxy') {
             steps {
                 echo 'Configuring proxy for network access...'
                 sh '''
+                    export http_proxy=http://192.168.31.139:7890
+                    export https_proxy=http://192.168.31.139:7890
                     git config --global http.proxy http://192.168.31.139:7890
                     git config --global https.proxy http://192.168.31.139:7890
+                    git config --global http.followRedirects true
+                    git config --global https.followRedirects true
+                    echo "Proxy configured: http_proxy=$http_proxy"
                 '''
             }
         }
 
         // 1. 环境准备
         stage('Checkout') {
+            environment {
+                HTTP_PROXY = 'http://192.168.31.139:7890'
+                HTTPS_PROXY = 'http://192.168.31.139:7890'
+            }
             steps {
                 echo 'Checkout source code...'
+                sh '''
+                    export http_proxy=http://192.168.31.139:7890
+                    export https_proxy=http://192.168.31.139:7890
+                '''
                 checkout scm
             }
         }
