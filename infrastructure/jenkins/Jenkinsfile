@@ -231,11 +231,11 @@ pipeline {
             steps {
                 echo 'Building and pushing backend Docker image to ghcr.io...'
                 dir('backend/feed-service') {
-                    sh '''
+                    sh """
                         export HTTP_PROXY="${HTTP_PROXY}"
                         export HTTPS_PROXY="${HTTP_PROXY}"
-                        export http_proxy=${HTTP_PROXY}
-                        export https_proxy=${HTTP_PROXY}
+                        export http_proxy="${HTTP_PROXY}"
+                        export https_proxy="${HTTP_PROXY}"
 
                         echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_USERNAME} --password-stdin
 
@@ -262,11 +262,11 @@ pipeline {
             steps {
                 echo 'Building and pushing frontend Docker image to ghcr.io...'
                 dir('frontend') {
-                    sh '''
+                    sh """
                         export HTTP_PROXY="${HTTP_PROXY}"
                         export HTTPS_PROXY="${HTTP_PROXY}"
-                        export http_proxy=${HTTP_PROXY}
-                        export https_proxy=${HTTP_PROXY}
+                        export http_proxy="${HTTP_PROXY}"
+                        export https_proxy="${HTTP_PROXY}"
 
                         echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_USERNAME} --password-stdin
 
