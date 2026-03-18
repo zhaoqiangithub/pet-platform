@@ -12,6 +12,10 @@ pipeline {
     }
 
     environment {
+        // 代理配置（解决网络访问问题）
+        HTTP_PROXY = 'http://192.168.31.139:7890'
+        HTTPS_PROXY = 'http://192.168.31.139:7890'
+
         // GitHub Container Registry 配置
         REGISTRY_URL = 'ghcr.io'
         REGISTRY_OWNER = 'zhaoqiangithub'
