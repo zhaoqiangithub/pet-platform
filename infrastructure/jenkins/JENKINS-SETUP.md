@@ -3,7 +3,7 @@
 ## 一、登录 Jenkins
 
 ```
-URL: http://100.75.140.35:8080
+URL: http://ci-cd:8080
 用户名: admin
 密码: admin
 ```

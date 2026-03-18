@@ -46,36 +46,6 @@ pipeline {
             }
         }
 
-        // 1.1 配置 Docker 镜像加速器
-        stage('Config Docker Mirror') {
-            steps {
-                echo 'Configuring Docker mirror...'
-                sh '''
-                    sudo mkdir -p /etc/docker
-                    sudo tee /etc/docker/daemon.json <<EOF
-{
-    "registry-mirrors": [
-        "https://5hrf1ou0.mirror.aliyuncs.com",
-        "https://docker.mirrors.ustc.edu.cn",
-        "https://docker.1ms.run",
-        "https://docker.domys.cc",
-        "https://docker.imgdb.de",
-        "https://docker-0.unsee.tech",
-        "https://docker.hlmirror.com",
-        "https://cjie.eu.org",
-        "https://docker.m.daocloud.io",
-        "https://hub.rat.dev",
-        "https://docker.1panel.live",
-        "https://docker.rainbond.cc"
-    ]
-}
-EOF
-                    sudo systemctl daemon-reload
-                    sudo systemctl restart docker || true
-                '''
-            }
-        }
-
         // 2. 后端构建 - 使用 Maven 容器
         stage('Build Backend') {
             when {
