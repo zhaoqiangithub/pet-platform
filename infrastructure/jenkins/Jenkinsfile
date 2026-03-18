@@ -91,7 +91,7 @@ pipeline {
             }
             steps {
                 echo 'Checkout source code...'
-                sh '''
+                sh """
                     export http_proxy="${HTTP_PROXY}"
                     export https_proxy="${HTTP_PROXY}"
                     export HTTP_PROXY="${HTTP_PROXY}"
@@ -118,7 +118,7 @@ pipeline {
             }
             steps {
                 echo 'Building backend with Maven 3.9 + JDK 17...'
-                sh '''
+                sh """
                     export http_proxy="${HTTP_PROXY}"
                     export https_proxy="${HTTP_PROXY}"
                     export HTTP_PROXY="${HTTP_PROXY}"
@@ -148,7 +148,7 @@ pipeline {
             }
             steps {
                 echo 'Building frontend with Node.js 20...'
-                sh '''
+                sh """
                     export http_proxy="${HTTP_PROXY}"
                     export https_proxy="${HTTP_PROXY}"
                     export HTTP_PROXY="${HTTP_PROXY}"
@@ -180,7 +180,7 @@ pipeline {
             }
             steps {
                 echo 'Running backend tests...'
-                sh '''
+                sh """
                     export http_proxy="${HTTP_PROXY}"
                     export https_proxy="${HTTP_PROXY}"
                     export HTTP_PROXY="${HTTP_PROXY}"
@@ -208,12 +208,12 @@ pipeline {
             }
             steps {
                 echo 'Running frontend tests...'
-                sh '''
+                sh """
                     export http_proxy="${HTTP_PROXY}"
                     export https_proxy="${HTTP_PROXY}"
                     export HTTP_PROXY="${HTTP_PROXY}"
                     export HTTPS_PROXY="${HTTP_PROXY}"
-                '''
+                """
                 dir('frontend') {
                     sh 'npm test -- --passWithNoTests'
                 }
