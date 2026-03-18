@@ -76,9 +76,14 @@ pipeline {
 
         // 3. 前端构建 - 使用 Node.js 容器
         stage('Build Frontend') {
+            environment {
+                HTTP_PROXY = 'http://192.168.31.139:7890'
+                HTTPS_PROXY = 'http://192.168.31.139:7890'
+            }
             agent {
                 docker {
                     image 'node:20'
+                    args '-e HTTP_PROXY -e HTTPS_PROXY'
                 }
             }
             steps {
@@ -94,10 +99,14 @@ pipeline {
 
         // 4. 单元测试
         stage('Test Backend') {
+            environment {
+                HTTP_PROXY = 'http://192.168.31.139:7890'
+                HTTPS_PROXY = 'http://192.168.31.139:7890'
+            }
             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
-                    args '-v /root/.m2:/root/.m2'
+                    args '-v /root/.m2:/root/.m2 -e HTTP_PROXY -e HTTPS_PROXY'
                 }
             }
             steps {
@@ -109,9 +118,14 @@ pipeline {
         }
 
         stage('Test Frontend') {
+            environment {
+                HTTP_PROXY = 'http://192.168.31.139:7890'
+                HTTPS_PROXY = 'http://192.168.31.139:7890'
+            }
             agent {
                 docker {
                     image 'node:20'
+                    args '-e HTTP_PROXY -e HTTPS_PROXY'
                 }
             }
             steps {
@@ -124,10 +138,17 @@ pipeline {
 
         // 5. 构建并推送 Docker 镜像 (后端)
         stage('Build & Push Backend') {
+            environment {
+                HTTP_PROXY = 'http://192.168.31.139:7890'
+                HTTPS_PROXY = 'http://192.168.31.139:7890'
+            }
             steps {
                 echo 'Building and pushing backend Docker image to ghcr.io...'
                 dir('backend/feed-service') {
                     sh """
+                        export HTTP_PROXY=http://192.168.31.139:7890
+                        export HTTPS_PROXY=http://192.168.31.139:7890
+
                         echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
 
                         docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
@@ -144,10 +165,17 @@ pipeline {
 
         // 6. 构建并推送 Docker 镜像 (前端)
         stage('Build & Push Frontend') {
+            environment {
+                HTTP_PROXY = 'http://192.168.31.139:7890'
+                HTTPS_PROXY = 'http://192.168.31.139:7890'
+            }
             steps {
                 echo 'Building and pushing frontend Docker image to ghcr.io...'
                 dir('frontend') {
                     sh """
+                        export HTTP_PROXY=http://192.168.31.139:7890
+                        export HTTPS_PROXY=http://192.168.31.139:7890
+
                         echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
 
                         docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
