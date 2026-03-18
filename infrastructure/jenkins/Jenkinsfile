@@ -1,10 +1,15 @@
 // Jenkins Pipeline - 宠物平台 CI/CD
 // 支持多分支构建
-// 注意: 需要在 Jenkins 节点上安装 Maven、Node.js、Docker 等工具
+// 使用 Docker Pipeline 管理工具版本
 
 pipeline {
-    // 使用 any 代理，不需要 Docker Pipeline 插件
-    agent any
+    // 默认使用 Docker 容器
+    agent {
+        docker {
+            image 'maven:3.9-eclipse-temurin-17'
+            args '-v /root/.m2:/root/.m2'
+        }
+    }
 
     environment {
         // GitHub Container Registry 配置
@@ -41,7 +46,7 @@ pipeline {
             }
         }
 
-        // 2. 后端构建
+        // 2. 后端构建 - 使用 Maven 容器
         stage('Build Backend') {
             when {
                 anyOf {
@@ -51,8 +56,14 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
             steps {
-                echo 'Building backend with Maven...'
+                echo 'Building backend with Maven 3.9 + JDK 17...'
                 dir('backend/feed-service') {
                     sh 'mvn --version'
                     sh 'mvn clean package -DskipTests'
@@ -60,7 +71,7 @@ pipeline {
             }
         }
 
-        // 3. 前端构建
+        // 3. 前端构建 - 使用 Node.js 容器
         stage('Build Frontend') {
             when {
                 anyOf {
@@ -70,8 +81,13 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            agent {
+                docker {
+                    image 'node:20'
+                }
+            }
             steps {
-                echo 'Building frontend with Node.js...'
+                echo 'Building frontend with Node.js 20...'
                 dir('frontend') {
                     sh 'node --version'
                     sh 'npm --version'
@@ -91,6 +107,12 @@ pipeline {
                     branch 'feature/**'
                 }
             }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-17'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
             steps {
                 echo 'Running backend tests...'
                 dir('backend/feed-service') {
@@ -106,6 +128,11 @@ pipeline {
                     branch 'main'
                     branch 'dev'
                     branch 'feature/**'
+                }
+            }
+            agent {
+                docker {
+                    image 'node:20'
                 }
             }
             steps {
