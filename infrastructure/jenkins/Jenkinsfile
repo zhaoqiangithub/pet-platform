@@ -1,6 +1,11 @@
 // Jenkins Pipeline - 宠物平台 CI/CD
 // 支持多分支构建
 // 使用 Docker Pipeline 管理工具版本
+//
+// 代理配置说明：
+// - HTTP_PROXY_HOST: 代理服务器 IP（从环境变量读取，默认留空）
+// - HTTP_PROXY_PORT: 代理服务器端口（从环境变量读取，默认留空）
+// - 如果未配置代理，相关命令可能因网络问题失败
 
 pipeline {
     // 默认使用 Docker 容器
@@ -13,8 +18,11 @@ pipeline {
 
     environment {
         // 代理配置（解决网络访问问题）
-        HTTP_PROXY = 'http://192.168.31.139:7890'
-        HTTPS_PROXY = 'http://192.168.31.139:7890'
+        // 从环境变量读取，如未设置则使用默认值
+        HTTP_PROXY_HOST = "${env.HTTP_PROXY_HOST ?: ''}"
+        HTTP_PROXY_PORT = "${env.HTTP_PROXY_PORT ?: ''}"
+        HTTP_PROXY = "http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}"
+        HTTPS_PROXY = "http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}"
 
         // GitHub Container Registry 配置
         REGISTRY_URL = 'ghcr.io'
@@ -39,37 +47,54 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 30, unit: 'MINUTES')
         timestamps()
+        // 全局 git 超时配置
+        gitConfigGlobal("http.postBuffer 524288000")
     }
 
     stages {
         // 0. 配置代理（解决网络访问问题）- 必须在 Checkout 之前运行
         stage('Config Proxy') {
+            when {
+                expression { env.HTTP_PROXY_HOST != '' }
+            }
             steps {
                 echo 'Configuring proxy for network access...'
-                sh '''
-                    export http_proxy=http://192.168.31.139:7890
-                    export https_proxy=http://192.168.31.139:7890
-                    git config --global http.proxy http://192.168.31.139:7890
-                    git config --global https.proxy http://192.168.31.139:7890
+                sh """
+                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export no_proxy=localhost,127.0.0.1
+
+                    git config --global http.proxy http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    git config --global https.proxy http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
                     git config --global http.followRedirects true
                     git config --global https.followRedirects true
+                    git config --global http.postBuffer 524288000
+                    git config --global http.lowSpeedLimit 1000
+                    git config --global http.lowSpeedTime 60
+
                     echo "Proxy configured: http_proxy=$http_proxy"
-                '''
+                """
             }
         }
 
         // 1. 环境准备
         stage('Checkout') {
             environment {
-                HTTP_PROXY = 'http://192.168.31.139:7890'
-                HTTPS_PROXY = 'http://192.168.31.139:7890'
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             steps {
                 echo 'Checkout source code...'
-                sh '''
-                    export http_proxy=http://192.168.31.139:7890
-                    export https_proxy=http://192.168.31.139:7890
-                '''
+                sh """
+                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                """
                 checkout scm
             }
         }
@@ -79,11 +104,24 @@ pipeline {
             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
-                    args '-v /root/.m2:/root/.m2'
+                    args '-v /root/.m2:/root/.m2 -e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
+                    reuseNode true
                 }
+            }
+            environment {
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             steps {
                 echo 'Building backend with Maven 3.9 + JDK 17...'
+                sh """
+                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                """
                 dir('backend/feed-service') {
                     sh 'mvn --version'
                     sh 'mvn clean package -DskipTests'
@@ -94,17 +132,26 @@ pipeline {
         // 3. 前端构建 - 使用 Node.js 容器
         stage('Build Frontend') {
             environment {
-                HTTP_PROXY = 'http://192.168.31.139:7890'
-                HTTPS_PROXY = 'http://192.168.31.139:7890'
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             agent {
                 docker {
                     image 'node:20'
-                    args '-e HTTP_PROXY -e HTTPS_PROXY'
+                    args '-e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
+                    reuseNode true
                 }
             }
             steps {
                 echo 'Building frontend with Node.js 20...'
+                sh """
+                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                """
                 dir('frontend') {
                     sh 'node --version'
                     sh 'npm --version'
@@ -117,17 +164,26 @@ pipeline {
         // 4. 单元测试
         stage('Test Backend') {
             environment {
-                HTTP_PROXY = 'http://192.168.31.139:7890'
-                HTTPS_PROXY = 'http://192.168.31.139:7890'
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
-                    args '-v /root/.m2:/root/.m2 -e HTTP_PROXY -e HTTPS_PROXY'
+                    args '-v /root/.m2:/root/.m2 -e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
+                    reuseNode true
                 }
             }
             steps {
                 echo 'Running backend tests...'
+                sh """
+                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                """
                 dir('backend/feed-service') {
                     sh 'mvn test'
                 }
@@ -136,17 +192,26 @@ pipeline {
 
         stage('Test Frontend') {
             environment {
-                HTTP_PROXY = 'http://192.168.31.139:7890'
-                HTTPS_PROXY = 'http://192.168.31.139:7890'
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             agent {
                 docker {
                     image 'node:20'
-                    args '-e HTTP_PROXY -e HTTPS_PROXY'
+                    args '-e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy'
+                    reuseNode true
                 }
             }
             steps {
                 echo 'Running frontend tests...'
+                sh """
+                    export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                    export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                '''
                 dir('frontend') {
                     sh 'npm test -- --passWithNoTests'
                 }
@@ -156,15 +221,19 @@ pipeline {
         // 5. 构建并推送 Docker 镜像 (后端)
         stage('Build & Push Backend') {
             environment {
-                HTTP_PROXY = 'http://192.168.31.139:7890'
-                HTTPS_PROXY = 'http://192.168.31.139:7890'
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             steps {
                 echo 'Building and pushing backend Docker image to ghcr.io...'
                 dir('backend/feed-service') {
                     sh """
-                        export HTTP_PROXY=http://192.168.31.139:7890
-                        export HTTPS_PROXY=http://192.168.31.139:7890
+                        export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                        export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                        export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                        export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
 
                         echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN} --password-stdin
 
@@ -183,15 +252,19 @@ pipeline {
         // 6. 构建并推送 Docker 镜像 (前端)
         stage('Build & Push Frontend') {
             environment {
-                HTTP_PROXY = 'http://192.168.31.139:7890'
-                HTTPS_PROXY = 'http://192.168.31.139:7890'
+                HTTP_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                HTTPS_PROXY = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                http_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
+                https_proxy = 'http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}'
             }
             steps {
                 echo 'Building and pushing frontend Docker image to ghcr.io...'
                 dir('frontend') {
                     sh """
-                        export HTTP_PROXY=http://192.168.31.139:7890
-                        export HTTPS_PROXY=http://192.168.31.139:7890
+                        export HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                        export HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                        export http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+                        export https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
 
                         echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN} --password-stdin
 

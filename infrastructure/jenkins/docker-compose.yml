@@ -1,6 +1,11 @@
 # Jenkins Docker Compose - CI/CD
 # 版本: lts
 # 用途: 开发/测试环境
+#
+# 使用方法：
+# 1. 复制 .env.example 为 .env
+# 2. 修改 .env 中的代理配置
+# 3. 运行 docker compose up -d
 
 version: '3.3'
 
@@ -17,11 +22,23 @@ services:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
+      # 挂载 gitconfig 配置文件，配置 HTTP 代理
+      # 使用 .env 中的代理配置
+      - ./gitconfig.template:/var/jenkins_home/gitconfig.template:ro
     environment:
       - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
       - DOCKER_HOST=unix:///var/run/docker.sock
       - JENKINS_USER_ID=admin
       - JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-admin}
+      # HTTP 代理配置（解决 Git/Docker/NPM 网络访问问题）
+      # 从 .env 文件读取
+      - HTTP_PROXY_HOST=${HTTP_PROXY_HOST}
+      - HTTP_PROXY_PORT=${HTTP_PROXY_PORT}
+      - HTTP_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+      - HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+      - http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+      - https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
+      - no_proxy=localhost,127.0.0.1,host.docker.internal
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
@@ -29,6 +46,13 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    # 容器启动后自动配置 Git 代理
+    command: >
+      bash -c "
+        cp /var/jenkins_home/gitconfig.template /var/jenkins_home/.gitconfig 2>/dev/null || true
+        sed -i 's|PROXY_HOST|${HTTP_PROXY_HOST:-}|g; s|PROXY_PORT|${HTTP_PROXY_PORT:-}|g' /var/jenkins_home/.gitconfig 2>/dev/null || true
+        exec /usr/bin/tini -- /usr/local/bin/jenkins.sh
+      "
 
 volumes:
   jenkins_home:

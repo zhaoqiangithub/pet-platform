@@ -49,7 +49,28 @@
       "WebFetch(domain:100.75.140.35)",
       "mcp__playwright__browser_navigate",
       "Bash(nc:*)",
-      "Bash(./test-jenkins.sh:*)"
+      "Bash(./test-jenkins.sh:*)",
+      "Bash(git add infrastructure/jenkins/Jenkinsfile infrastructure/jenkins/JENKINS-SETUP.md infrastructure/CLAUDE.md infrastructure/.env)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_wait_for",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git fetch:*)",
+      "Bash(git worktree:*)",
+      "Bash(git apply:*)",
+      "Bash(git stash push:*)",
+      "Bash(git stash:*)",
+      "Bash(lsof:*)",
+      "Bash(python3:*)",
+      "mcp__playwright__browser_install",
+      "Bash(docker exec:*)",
+      "Bash(docker compose restart:*)"
     ]
   }
 }

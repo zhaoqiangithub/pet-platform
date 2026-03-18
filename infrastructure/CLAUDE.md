@@ -159,9 +159,58 @@ chmod +x install.sh generate-certs.sh
 
 ```bash
 cd infrastructure/jenkins
-chmod +x install.sh
-./install.sh
+
+# 1. 复制配置模板
+cp ../.env.example ../.env
+
+# 2. 编辑配置文件，填入代理和其他敏感信息
+vim ../.env
+
+# 3. 启动 Jenkins
+docker compose up -d
 ```
+
+#### 敏感信息与配置管理
+
+**设计原则**：所有敏感信息（如密码、IP、端口）必须从配置文件读取，不硬编码到代码中。
+
+- **敏感配置**：存放在 `infrastructure/.env`（不提交到 Git）
+- **配置模板**：使用 `infrastructure/.env.example`（提交到 Git）
+- **部署脚本**：从 `.env` 读取配置
+
+#### 网络代理配置
+
+如果 Jenkins 部署环境无法直接访问外网（如 GitHub、Docker Hub），需要配置 HTTP 代理：
+
+**配置步骤**：
+
+```bash
+# 1. 编辑 .env 文件
+cd infrastructure
+cp .env.example .env
+vim .env
+
+# 2. 填入代理配置（根据你的网络环境修改）
+HTTP_PROXY_HOST=<your-proxy-host>
+HTTP_PROXY_PORT=<your-proxy-port>
+
+# 3. 重启 Jenkins 使配置生效
+cd jenkins
+docker compose restart
+```
+
+**配置说明**：
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `HTTP_PROXY_HOST` | 代理服务器 IP 或域名 | `192.168.31.139` |
+| `HTTP_PROXY_PORT` | 代理服务器端口 | `7890` |
+
+**工作原理**：
+
+1. `docker-compose.yml` 从 `.env` 读取代理配置
+2. 容器启动时，自动将代理配置写入 `~/.gitconfig`
+3. Git/Docker/NPM 自动使用代理访问外网
 
 ## 远程部署（测试/生产环境）
 

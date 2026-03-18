@@ -1,0 +1,18 @@
+# Git 配置文件模板 - Jenkins CI/CD
+# 此文件为模板，启动时会被自动替换为实际代理配置
+#
+# 占位符说明：
+# - PROXY_HOST: 代理服务器 IP 或域名
+# - PROXY_PORT: 代理服务器端口
+
+[http]
+    proxy = http://PROXY_HOST:PROXY_PORT
+    postBuffer = 524288000
+    lowSpeedLimit = 1000
+    lowSpeedTime = 60
+
+[https]
+    proxy = http://PROXY_HOST:PROXY_PORT
+
+[url "https://github.com/"]
+    insteadOf = git://github.com/
