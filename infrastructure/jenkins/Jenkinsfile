@@ -59,6 +59,7 @@ pipeline {
 
         // 2. 后端构建 - 使用 Maven 容器
         stage('Build Backend') {
+            beforeAgent true
             when {
                 anyOf {
                     changeset "backend/**"
@@ -84,6 +85,7 @@ pipeline {
 
         // 3. 前端构建 - 使用 Node.js 容器
         stage('Build Frontend') {
+            beforeAgent true
             when {
                 anyOf {
                     changeset "frontend/**"
@@ -110,6 +112,7 @@ pipeline {
 
         // 4. 单元测试
         stage('Test Backend') {
+            beforeAgent true
             when {
                 anyOf {
                     changeset "backend/**"
@@ -133,6 +136,7 @@ pipeline {
         }
 
         stage('Test Frontend') {
+            beforeAgent true
             when {
                 anyOf {
                     changeset "frontend/**"
@@ -156,6 +160,7 @@ pipeline {
 
         // 5. 构建并推送 Docker 镜像 (后端)
         stage('Build & Push Backend') {
+            beforeAgent true
             when {
                 anyOf {
                     branch 'main'
@@ -183,6 +188,7 @@ pipeline {
 
         // 6. 构建并推送 Docker 镜像 (前端)
         stage('Build & Push Frontend') {
+            beforeAgent true
             when {
                 anyOf {
                     branch 'main'
@@ -210,6 +216,7 @@ pipeline {
 
         // 7. 部署到 K8s (通过 SSH)
         stage('Deploy to K8s') {
+            beforeAgent true
             when {
                 anyOf {
                     branch 'main'
@@ -264,8 +271,10 @@ pipeline {
 
     post {
         always {
-            echo 'Cleaning workspace...'
-            cleanWs()
+            node {
+                echo 'Cleaning workspace...'
+                cleanWs()
+            }
         }
         success {
             echo 'Build succeeded!'
