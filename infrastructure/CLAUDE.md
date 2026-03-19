@@ -251,44 +251,41 @@ chmod +x deploy.sh test-jenkins.sh
 
 ```
 代码 push → GitHub → Jenkins 自动构建 → 单元测试 + 打包
-    → 构建 Docker 镜像 → 推送到 ghcr.io → 部署到 K8s
+    → 构建 Docker 镜像 → 推送到 Docker Registry → 部署到 K8s
 ```
 
-### GitHub Container Registry (ghcr.io)
+### Docker Registry 私有镜像仓库
 
-项目使用 GitHub Container Registry 存储 Docker 镜像。
+项目使用 Docker Registry 私有镜像仓库存储 Docker 镜像。
 
 #### 镜像命名规范
 
 ```
-ghcr.io/{owner}/pet-platform/{service}:{tag}
+localhost:5000/pet-platform/{service}:{tag}
 ```
 
 示例：
-- 后端：`ghcr.io/zhaoqiang/pet-platform/feed-service:latest`
-- 前端：`ghcr.io/zhaoqiang/pet-platform/frontend:latest`
+- 后端：`localhost:5000/pet-platform/feed-service:latest`
+- 前端：`localhost:5000/pet-platform/frontend:latest`
 
 #### 认证配置
 
-1. 在 GitHub 创建 Personal Access Token：
-   - 访问 https://github.com/settings/tokens
-   - 创建 Classic Token，勾选 `write:packages` 和 `read:packages`
-
-2. 在 Jenkins 添加凭据：
-   - 类型：Secret text
-   - ID：`github-token`
-   - Secret：Token 值
+1. 在 Jenkins 添加凭据：
+   - 类型：Username with password
+   - ID：`registry-credential`
+   - Username：`admin`
+   - Password：Registry 登录密码
 
 #### K8s 拉取镜像
 
 在 K8s 集群中创建 Image Pull Secret：
 
 ```bash
-kubectl create secret docker-registry ghcr-io-secret \
-  --docker-server=ghcr.io \
-  --docker-username={your-github-username} \
-  --docker-password={your-github-token} \
-  --docker-email=your@email.com \
+kubectl create secret docker-registry registry-secret \
+  --docker-server=localhost:5000 \
+  --docker-username=admin \
+  --docker-password=admin \
+  --docker-email=admin@pet.com \
   -n pet-platform
 ```
 
@@ -299,10 +296,10 @@ spec:
   template:
     spec:
       imagePullSecrets:
-        - name: ghcr-io-secret
+        - name: registry-secret
       containers:
         - name: feed-service
-          image: ghcr.io/zhaoqiang/pet-platform/feed-service:latest
+          image: localhost:5000/pet-platform/feed-service:latest
           imagePullPolicy: Always
 ```
 
@@ -313,7 +310,7 @@ spec:
 #### Pipeline 流程
 
 ```
-Git Push → Checkout → Build → Test → Docker Build → Push to ghcr.io → Deploy to K8s
+Git Push → Checkout → Build → Test → Docker Build → Push to Registry → Deploy to K8s
 ```
 
 #### 分支策略
@@ -329,10 +326,12 @@ Git Push → Checkout → Build → Test → Docker Build → Push to ghcr.io �
 配置文件：`infrastructure/.env`
 
 ```bash
-# GitHub Container Registry
-GITHUB_REGISTRY=ghcr.io
-GITHUB_OWNER=zhaoqiangithub
-GITHUB_TOKEN=<your-github-token>
+# Docker Registry 私有镜像仓库
+REGISTRY_URL=localhost
+REGISTRY_PORT=5000
+REGISTRY_PROJECT=pet-platform
+REGISTRY_USER=admin
+REGISTRY_PASSWORD=<your-registry-password>
 
 # K8s 集群
 K8S_MASTER_IP=100.89.107.21

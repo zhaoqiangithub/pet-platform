@@ -37,8 +37,11 @@ services:
       - http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - no_proxy=localhost,127.0.0.1,host.docker.internal
-      # GitHub Container Registry Token（用于 Docker login）
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # Docker Registry 配置（用于 Docker login）
+      - REGISTRY_URL=${REGISTRY_URL}
+      - REGISTRY_PORT=${REGISTRY_PORT}
+      - REGISTRY_USER=${REGISTRY_USER}
+      - REGISTRY_PASSWORD=${REGISTRY_PASSWORD}
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
@@ -57,3 +60,7 @@ services:
 volumes:
   jenkins_home:
     driver: local
+
+networks:
+  harbor-network:
+    external: true

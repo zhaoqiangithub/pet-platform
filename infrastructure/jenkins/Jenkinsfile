@@ -5,14 +5,15 @@ pipeline {
     agent any
 
     environment {
-        // GitHub Container Registry 配置
-        REGISTRY_URL = 'ghcr.io'
-        REGISTRY_OWNER = 'zhaoqiangithub'
-        IMAGE_NAME = 'pet-platform'
-        DOCKER_REGISTRY = "${REGISTRY_URL}/${REGISTRY_OWNER}/${IMAGE_NAME}"
+        // Docker Registry 配置
+        REGISTRY_URL = "${params.REGISTRY_URL ?: 'localhost'}"
+        REGISTRY_PORT = "${params.REGISTRY_PORT ?: '5000'}"
+        REGISTRY_PROJECT = "${params.REGISTRY_PROJECT ?: 'pet-platform'}"
+        DOCKER_REGISTRY = "${REGISTRY_URL}:${REGISTRY_PORT}/${REGISTRY_PROJECT}"
 
-        // GitHub 凭证（从环境变量读取，.env 文件注入）
-        GITHUB_USERNAME = 'zhaoqiangithub'
+        // Registry 凭证（使用 withCredentials 获取）
+        REGISTRY_USER = "${params.REGISTRY_USER ?: 'admin'}"
+        REGISTRY_PASSWORD = credentials('registry-credential')
 
         // K8s 配置
         K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
@@ -149,15 +150,17 @@ pipeline {
             }
             steps {
                 echo 'Building and pushing backend Docker image...'
-                sh '''
-                    echo $GITHUB_TOKEN | docker login $REGISTRY_URL -u $GITHUB_USERNAME --password-stdin
-                    cd backend/feed-service
-                    docker build -t $DOCKER_REGISTRY/feed-service:$GIT_COMMIT .
-                    docker build -t $DOCKER_REGISTRY/feed-service:latest .
-                    docker push $DOCKER_REGISTRY/feed-service:$GIT_COMMIT
-                    docker push $DOCKER_REGISTRY/feed-service:latest
-                    docker logout $REGISTRY_URL
-                '''
+                withCredentials([string(credentialsId: 'registry-credential', variable: 'REGISTRY_PASSWORD')]) {
+                    sh '''
+                        echo "Logging in to Docker Registry..."
+                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
+                        cd backend/feed-service
+                        docker build -t $DOCKER_REGISTRY/feed-service:$GIT_COMMIT .
+                        docker build -t $DOCKER_REGISTRY/feed-service:latest .
+                        docker push $DOCKER_REGISTRY/feed-service:$GIT_COMMIT
+                        docker push $DOCKER_REGISTRY/feed-service:latest
+                    '''
+                }
             }
         }
 
@@ -172,15 +175,17 @@ pipeline {
             }
             steps {
                 echo 'Building and pushing frontend Docker image...'
-                sh '''
-                    echo $GITHUB_TOKEN | docker login $REGISTRY_URL -u $GITHUB_USERNAME --password-stdin
-                    cd frontend
-                    docker build -t $DOCKER_REGISTRY/frontend:$GIT_COMMIT .
-                    docker build -t $DOCKER_REGISTRY/frontend:latest .
-                    docker push $DOCKER_REGISTRY/frontend:$GIT_COMMIT
-                    docker push $DOCKER_REGISTRY/frontend:latest
-                    docker logout $REGISTRY_URL
-                '''
+                withCredentials([string(credentialsId: 'registry-credential', variable: 'REGISTRY_PASSWORD')]) {
+                    sh '''
+                        echo "Logging in to Docker Registry..."
+                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
+                        cd frontend
+                        docker build -t $DOCKER_REGISTRY/frontend:$GIT_COMMIT .
+                        docker build -t $DOCKER_REGISTRY/frontend:latest .
+                        docker push $DOCKER_REGISTRY/frontend:$GIT_COMMIT
+                        docker push $DOCKER_REGISTRY/frontend:latest
+                    '''
+                }
             }
         }
 
