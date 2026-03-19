@@ -14,7 +14,7 @@ services:
     privileged: true
     user: root
     env_file:
-      - ../.env
+      - ./.env
     ports:
       - "8080:8080"
       - "50000:50000"
@@ -38,7 +38,7 @@ services:
       - HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-      - no_proxy=localhost,127.0.0.1,host.docker.internal,pet-registry,registry,docker-registry_default,jenkins_default,192.168.0.0/16,.local
+      - no_proxy=localhost,127.0.0.1,host.docker.internal,pet-registry,registry,docker-registry_default,jenkins_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16,.local,100.75.140.35
       # Docker Registry 配置（用于 Docker login）
       - REGISTRY_URL=${REGISTRY_URL}
       - REGISTRY_PORT=${REGISTRY_PORT}

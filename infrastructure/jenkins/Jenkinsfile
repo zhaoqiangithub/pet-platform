@@ -164,7 +164,7 @@ pipeline {
                     sh '''
                         echo "Logging in to Docker Registry..."
                         unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
-                        export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16"
+                        export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16"
                         docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
                         cd backend/feed-service
                         docker build -t $DOCKER_REGISTRY/feed-service:$GIT_COMMIT .
@@ -191,7 +191,7 @@ pipeline {
                     sh '''
                         echo "Logging in to Docker Registry..."
                         unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
-                        export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16"
+                        export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16"
                         docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
                         cd frontend
                         docker build -t $DOCKER_REGISTRY/frontend:$GIT_COMMIT .
