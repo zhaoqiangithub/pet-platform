@@ -36,7 +36,7 @@ services:
       - HTTPS_PROXY=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - http_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
       - https_proxy=http://${HTTP_PROXY_HOST}:${HTTP_PROXY_PORT}
-      - no_proxy=localhost,127.0.0.1,host.docker.internal
+      - no_proxy=localhost,127.0.0.1,host.docker.internal,pet-registry,registry,docker-registry_default,jenkins_default,192.168.0.0/16,.local
       # Docker Registry 配置（用于 Docker login）
       - REGISTRY_URL=${REGISTRY_URL}
       - REGISTRY_PORT=${REGISTRY_PORT}

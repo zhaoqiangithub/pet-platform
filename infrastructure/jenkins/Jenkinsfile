@@ -6,7 +6,7 @@ pipeline {
 
     environment {
         // Docker Registry 配置
-        REGISTRY_URL = "${params.REGISTRY_URL ?: 'host.docker.internal'}"
+        REGISTRY_URL = "${params.REGISTRY_URL ?: 'pet-registry'}"
         REGISTRY_PORT = "${params.REGISTRY_PORT ?: '5000'}"
         REGISTRY_PROJECT = "${params.REGISTRY_PROJECT ?: 'pet-platform'}"
         DOCKER_REGISTRY = "${REGISTRY_URL}:${REGISTRY_PORT}/${REGISTRY_PROJECT}"
@@ -21,6 +21,10 @@ pipeline {
         K8S_TEST_NS = "${params.K8S_TEST_NS ?: 'pet-platform-test'}"
         K8S_PROD_NS = "${params.K8S_PROD_NS ?: 'pet-platform-prod'}"
         K8S_SSH_PASSWORD = credentials('k8s-ssh-credential')
+
+        // 镜像加速配置（国内环境使用）
+        MAVEN_MIRROR = "${params.MAVEN_MIRROR ?: 'https://maven.aliyun.com/repository/public'}"
+        NPM_MIRROR = "${params.NPM_MIRROR ?: 'https://registry.npmmirror.com'}"
     }
 
     options {
@@ -57,9 +61,46 @@ pipeline {
             }
             steps {
                 echo 'Building backend with Maven...'
+                echo "Using Maven mirror: ${MAVEN_MIRROR}"
                 dir('backend/feed-service') {
+                    // 配置 Maven 阿里云镜像
                     sh 'mvn --version'
-                    sh 'mvn clean package -DskipTests'
+                    sh '''
+                        mkdir -p ~/.m2
+                        cat > ~/.m2/settings.xml << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <mirrors>
+        <mirror>
+            <id>aliyun</id>
+            <name>Aliyun Maven Repository</name>
+            <url>${MAVEN_MIRROR}</url>
+            <mirrorOf>central</mirrorOf>
+        </mirror>
+    </mirrors>
+    <profiles>
+        <profile>
+            <id>aliyun</id>
+            <repositories>
+                <repository>
+                    <id>central</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>aliyun</activeProfile>
+    </activeProfiles>
+</settings>
+'''
+                    cat ~/.m2/settings.xml
+                    mvn clean package -DskipTests
                 }
             }
         }
@@ -82,9 +123,13 @@ pipeline {
             }
             steps {
                 echo 'Building frontend with Node.js...'
+                echo "Using NPM mirror: ${NPM_MIRROR}"
                 dir('frontend') {
                     sh 'node --version'
                     sh 'npm --version'
+                    // 配置 NPM 淘宝镜像
+                    sh 'npm config set registry ${NPM_MIRROR}'
+                    sh 'npm config get registry'
                     sh 'npm ci --legacy-peer-deps'
                     sh 'npx expo export'
                 }
@@ -111,7 +156,7 @@ pipeline {
             steps {
                 echo 'Running backend tests...'
                 dir('backend/feed-service') {
-                    sh 'mvn test'
+                    sh 'mvn test -s ~/.m2/settings.xml'
                 }
             }
         }
