@@ -150,7 +150,7 @@ pipeline {
             }
             steps {
                 echo 'Building and pushing backend Docker image...'
-                withCredentials([string(credentialsId: 'registry-credential', variable: 'REGISTRY_PASSWORD')]) {
+                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
                     sh '''
                         echo "Logging in to Docker Registry..."
                         docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
@@ -175,7 +175,7 @@ pipeline {
             }
             steps {
                 echo 'Building and pushing frontend Docker image...'
-                withCredentials([string(credentialsId: 'registry-credential', variable: 'REGISTRY_PASSWORD')]) {
+                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
                     sh '''
                         echo "Logging in to Docker Registry..."
                         docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
