@@ -42,3 +42,5 @@ networks:
   default:
     name: jenkins_default
     external: true
+  jenkins_default:
+    external: true

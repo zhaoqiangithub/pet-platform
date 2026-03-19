@@ -2,12 +2,25 @@
 
 本文件定义了项目基础设施的部署、配置和管理规范。
 
+## 敏感信息处理
+
+**重要原则**：当遇到账号、密码、配置值不确定时，**必须向用户询问**，不要猜测。
+
+常见需要询问的场景：
+- Docker Hub 登录凭据
+- GitHub Token
+- 服务器 SSH 密码
+- Harbor/Registry 访问凭证
+
+---
+
 ## 模块概述
 
 infrastructure 模块负责项目的基础设施即代码管理，包括：
 - Jenkins CI/CD 服务
 - Docker Registry 私有镜像仓库
 - Harbor 私有镜像仓库（完整版）
+- Kubernetes 应用部署配置
 
 ## 目录结构
 
@@ -15,14 +28,15 @@ infrastructure 模块负责项目的基础设施即代码管理，包括：
 infrastructure/
 ├── .env.example              # 环境配置模板
 ├── .env                     # 敏感配置（不提交到版本库）
+├── CLAUDE.md                # 基础设施配置规范
 ├── jenkins/                  # CI/CD 服务
 │   ├── docker-compose.yml   # Docker Compose 配置
 │   ├── install.sh           # 本地安装脚本
 │   ├── deploy.sh            # 远程部署脚本
 │   ├── test-jenkins.sh      # 健康检查脚本
-│   ├── k8s/
-│   │   └── deployment.yaml  # K8s 部署配置
-│   └── Jenkinsfile          # CI/CD Pipeline 模板
+│   ├── Jenkinsfile          # CI/CD Pipeline 模板
+│   └── k8s/
+│       └── deployment.yaml  # Jenkins K8s 部署配置
 ├── harbor/                   # Harbor 私有镜像仓库（完整版）
 │   ├── docker-compose.yml
 │   ├── harbor.yml           # Harbor 主配置
@@ -31,11 +45,20 @@ infrastructure/
 │   ├── generate-certs.sh    # 证书生成脚本
 │   ├── install.sh
 │   └── k8s/
-│       └── deployment.yaml
+│       └── deployment.yaml  # Harbor K8s 部署配置
 ├── docker-registry/          # Docker Registry（轻量版）
 │   ├── docker-compose.yml
 │   ├── deploy.sh            # 远程部署脚本
 │   └── test-registry.sh    # 测试脚本
+├── k8s/                     # 应用 Kubernetes 配置
+│   ├── CLAUDE.md           # K8s 配置规范
+│   └── feed-service/        # 服务部署配置
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       ├── configmap.yaml
+│       ├── secret.yaml
+│       ├── ingress.yaml
+│       └── kustomization.yaml
 └── README.md
 ```
 
@@ -421,9 +444,12 @@ docker compose down
 3. 验证 Jenkins API 可访问
 4. 输出健康状态报告
 
-## K8s 部署（可选）
+## K8s 部署配置
 
-infrastructure 也提供了 K8s 部署配置：
+infrastructure 包含两类 K8s 配置：
+
+### 1. 基础设施 K8s 部署
+用于将 Jenkins、Harbor 等基础设施服务部署到 K8s：
 
 ```bash
 # 部署 Jenkins 到 K8s
@@ -432,6 +458,19 @@ kubectl apply -f infrastructure/jenkins/k8s/deployment.yaml
 # 部署 Harbor 到 K8s
 kubectl apply -f infrastructure/harbor/k8s/deployment.yaml
 ```
+
+### 2. 应用 K8s 部署
+用于将微服务应用部署到 K8s：
+
+```bash
+# 部署应用到 K8s（使用 Kustomize）
+kubectl apply -k infrastructure/k8s/feed-service/
+
+# 或直接应用 YAML
+kubectl apply -f infrastructure/k8s/feed-service/
+```
+
+详细 K8s 配置规范请参考：[k8s/CLAUDE.md](./k8s/CLAUDE.md)
 
 ## 注意事项
 
@@ -442,5 +481,6 @@ kubectl apply -f infrastructure/harbor/k8s/deployment.yaml
 
 ## 版本记录
 
+- 2026-03-19: 合并 k8s 目录到 infrastructure
 - 2026-03-18: 添加 Jenkins 远程部署和健康检查脚本
 - 2026-03-14: 初始版本，定义基础设施模块
