@@ -6,7 +6,7 @@ pipeline {
 
     environment {
         // Docker Registry 配置
-        REGISTRY_URL = "${params.REGISTRY_URL ?: 'localhost'}"
+        REGISTRY_URL = "${params.REGISTRY_URL ?: 'host.docker.internal'}"
         REGISTRY_PORT = "${params.REGISTRY_PORT ?: '5000'}"
         REGISTRY_PROJECT = "${params.REGISTRY_PROJECT ?: 'pet-platform'}"
         DOCKER_REGISTRY = "${REGISTRY_URL}:${REGISTRY_PORT}/${REGISTRY_PROJECT}"
