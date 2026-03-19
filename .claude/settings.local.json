@@ -156,7 +156,13 @@
       "Bash(# Check all builds curl -s -b /tmp/jenkins_cookies59.txt -c /tmp/jenkins_cookies59.txt -u admin:admin \"\"http://ci-cd:8080/job/pet-platform/job/feature%252Fmap-rescue-info/api/json\"\")",
       "Bash(# Wait and check again sleep 60 curl -s -b /tmp/jenkins_cookies59.txt -c /tmp/jenkins_cookies59.txt -u admin:admin \"\"http://ci-cd:8080/job/pet-platform/job/feature%252Fmap-rescue-info/api/json\"\")",
       "Bash(# Wait for build to complete sleep 300 # Get final result curl -s -b /tmp/jenkins_cookies59.txt -c /tmp/jenkins_cookies59.txt -u admin:admin \"\"http://ci-cd:8080/job/pet-platform/job/feature%252Fmap-rescue-info/61/consoleText\"\")",
-      "Bash(#:*)"
+      "Bash(#:*)",
+      "Bash(cd:*)",
+      "Bash(git -C /Users/zhaoqiang/Dedema/pet-platform-map-rescue-info show --stat HEAD)",
+      "Bash(git -C /Users/zhaoqiang/Dedema/pet-platform-map-rescue-info status)",
+      "Bash(docker network:*)",
+      "Bash(echo:*)",
+      "Bash(docker:*)"
     ]
   }
 }
