@@ -16,7 +16,7 @@ pipeline {
         REGISTRY_PASSWORD = credentials('registry-credential')
 
         // K8s config
-        K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.2'}"
+        K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
         K8S_SSH_USER = "${params.K8S_SSH_USER ?: 'root'}"
         K8S_TEST_NS = "${params.K8S_TEST_NS ?: 'pet-platform-test'}"
         K8S_PROD_NS = "${params.K8S_PROD_NS ?: 'pet-platform-prod'}"
