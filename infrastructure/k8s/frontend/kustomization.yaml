@@ -1,0 +1,13 @@
+# K8s Kustomization - frontend
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: placeholder-namespace
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+commonLabels:
+  app: frontend
+  version: v1

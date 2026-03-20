@@ -1,4 +1,5 @@
-# K8s Deployment - Jenkins
+# K8s Deployment - Jenkins (CI/CD 服务器)
+# 适用于将 Jenkins 部署到 K8s 集群
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +20,18 @@ spec:
       securityContext:
         fsGroup: 1000
         runAsUser: 0
+      # DinD (Docker-in-Docker) Init Container
+      initContainers:
+        - name: docker-init
+          image: docker:24-dind
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          volumeMounts:
+            - name: docker-graph-storage
+              mountPath: /var/lib/docker
       containers:
         - name: jenkins
           image: jenkins/jenkins:2.446.1-lts
@@ -30,6 +43,13 @@ spec:
           volumeMounts:
             - name: jenkins-home
               mountPath: /var/jenkins_home
+            - name: docker-graph-storage
+              mountPath: /var/lib/docker
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
           resources:
             requests:
               memory: "512Mi"
@@ -41,38 +61,48 @@ spec:
             httpGet:
               path: /login
               port: 8080
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 10
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /login
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: jenkins-home
           persistentVolumeClaim:
             claimName: jenkins-pvc
+        - name: docker-graph-storage
+          emptyDir: {}
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
 ---
-# K8s Service - Jenkins
+# K8s Service - Jenkins (NodePort 暴露)
 apiVersion: v1
 kind: Service
 metadata:
   name: jenkins
   namespace: infrastructure
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - port: 8080
       targetPort: 8080
+      nodePort: 30080
       name: http
     - port: 50000
       targetPort: 50000
+      nodePort: 30050
       name: jnlp
   selector:
     app: jenkins
 ---
-# K8s PVC - Jenkins
+# K8s PVC - Jenkins (使用默认 StorageClass)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -84,4 +114,3 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: nfs-storage

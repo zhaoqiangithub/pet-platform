@@ -54,15 +54,18 @@ pipeline {
             }
             steps {
                 echo 'Syncing K8s config to remote server...'
-                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernamePasswordVariable: 'REGISTRY_CREDS')]) {
-                    sh """
-                        export SSHPASS="${K8S_SSH_PASSWORD}"
-                        # 创建远程服务器上的 K8s 配置目录
-                        sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} 'mkdir -p /tmp/k8s/overlays/test /tmp/k8s/overlays/prod'
-                        # 同步 K8s 配置文件（使用 scp）
-                        sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/test/* ${K8S_SSH_USER}@${K8S_MASTER_IP}:/tmp/k8s/overlays/test/ || true
-                        sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/prod/* ${K8S_SSH_USER}@${K8S_MASTER_IP}:/tmp/k8s/overlays/prod/ || true
-                    """
+                sh """
+                    export SSHPASS="${K8S_SSH_PASSWORD_PSW}"
+                    # 创建远程服务器上的 K8s 配置目录
+                    sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} 'mkdir -p /opt/pet-platform/k8s/overlays/test /opt/pet-platform/k8s/overlays/prod'
+                    # 同步 K8s 配置文件
+                    sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/test ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/overlays/ || true
+                    sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/prod ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/overlays/ || true
+                    # 同步 feed-service 基础配置
+                    sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/feed-service ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/ || true
+                    # 同步 frontend 基础配置
+                    sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/frontend ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/ || true
+                """
                 }
             }
         }
@@ -190,7 +193,7 @@ pipeline {
                         echo "Logging in to Docker Registry..."
                         unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
                         export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16"
-                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
+                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD"
                         cd backend/feed-service
                         docker build -t $DOCKER_REGISTRY/feed-service:$GIT_COMMIT .
                         docker build -t $DOCKER_REGISTRY/feed-service:latest .
@@ -217,7 +220,7 @@ pipeline {
                         echo "Logging in to Docker Registry..."
                         unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
                         export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16"
-                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
+                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD"
                         cd frontend
                         docker build -t $DOCKER_REGISTRY/frontend:$GIT_COMMIT .
                         docker build -t $DOCKER_REGISTRY/frontend:latest .
@@ -247,56 +250,110 @@ pipeline {
 
                 withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
                     sh """
-                        export SSHPASS="${K8S_SSH_PASSWORD}"
+                        export SSHPASS="${K8S_SSH_PASSWORD_PSW}"
                         sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 
+                            set -e
+
+                            # 确定目标 namespace
                             if [ "${env.BRANCH_NAME}" = "main" ]; then
                                 NAMESPACE="${K8S_PROD_NS}"
+                                OVERLAY_DIR="/opt/pet-platform/k8s/overlays/prod"
                             elif [ "${env.BRANCH_NAME}" = "dev" ]; then
                                 NAMESPACE="${K8S_TEST_NS}"
+                                OVERLAY_DIR="/opt/pet-platform/k8s/overlays/test"
                             else
                                 # feature 分支部署到测试环境
                                 NAMESPACE="${K8S_TEST_NS}"
+                                OVERLAY_DIR="/opt/pet-platform/k8s/overlays/test"
                             fi
 
                             echo "Deploying to namespace: \$NAMESPACE"
+
+                            # 检查 kubectl 是否安装
+                            if ! command -v kubectl &> /dev/null; then
+                                echo "kubectl not found, installing..."
+                                curl -LO "https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl"
+                                chmod +x kubectl
+                                mv kubectl /usr/local/bin/
+                            fi
+
+                            # 检查 kustomize 是否安装
+                            if ! command -v kustomize &> /dev/null; then
+                                echo "kustomize not found, installing..."
+                                curl -LO "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.0/kustomize_v5.4.0_linux_amd64.tar.gz"
+                                tar -xzf kustomize_v5.4.0_linux_amd64.tar.gz
+                                chmod +x kustomize
+                                mv kustomize /usr/local/bin/
+                                rm kustomize_v5.4.0_linux_amd64.tar.gz
+                            fi
+
+                            # 检查 kubeconfig 是否存在
+                            if [ ! -f ~/.kube/config ]; then
+                                echo "kubeconfig not found, configuring..."
+                                mkdir -p ~/.kube
+                                # 如果是 K8s master 节点，可能有本地 kubeconfig
+                                if [ -f /etc/kubernetes/admin.conf ]; then
+                                    cp /etc/kubernetes/admin.conf ~/.kube/config
+                                else
+                                    echo "WARNING: No kubeconfig found. Using kubectl with in-cluster config."
+                                fi
+                            fi
 
                             # 创建 namespace（如果不存在）
                             kubectl create namespace \$NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
                             # 创建 image pull secret（如果不存在）
-                            kubectl create secret docker-registry registry-secret \\
-                                --docker-server=${REGISTRY_URL}:${REGISTRY_PORT} \\
-                                --docker-username=${REGISTRY_USER} \\
-                                --docker-password="${REGISTRY_PASSWORD}" \\
-                                --docker-email=admin@pet.com \\
+                            kubectl create secret docker-registry registry-secret \
+                                --docker-server=${REGISTRY_URL}:${REGISTRY_PORT} \
+                                --docker-username=${REGISTRY_USER} \
+                                --docker-password="${REGISTRY_PASSWORD}" \
+                                --docker-email=admin@pet.com \
                                 -n \$NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
-                            # 检查 deployment 是否存在，不存在则先部署基础配置
+                            # 检查 feed-service deployment 是否存在
                             if ! kubectl get deployment feed-service -n \$NAMESPACE 2>/dev/null; then
-                                echo "Deployment not found, deploying base configuration..."
-                                # 使用 kustomize 部署基础配置
-                                kubectl apply -k /tmp/k8s/overlays/test -n \$NAMESPACE || true
+                                echo "feed-service deployment not found, deploying base configuration with kustomize..."
+                                if [ -d "\$OVERLAY_DIR" ]; then
+                                    kubectl apply -k \$OVERLAY_DIR -n \$NAMESPACE || {
+                                        echo "Kustomize failed, trying direct apply..."
+                                        kubectl apply -f /opt/pet-platform/k8s/feed-service/ -n \$NAMESPACE || true
+                                    }
+                                else
+                                    echo "Overlay dir \$OVERLAY_DIR not found, using direct apply"
+                                    kubectl apply -f /opt/pet-platform/k8s/feed-service/ -n \$NAMESPACE || true
+                                fi
                             fi
 
-                            # 更新镜像版本
+                            # 检查 frontend deployment 是否存在
+                            if ! kubectl get deployment frontend -n \$NAMESPACE 2>/dev/null; then
+                                echo "frontend deployment not found, deploying..."
+                                kubectl apply -f /opt/pet-platform/k8s/frontend/ -n \$NAMESPACE || true
+                            fi
+
+                            # 更新 feed-service 镜像版本
                             echo "Updating feed-service image to ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}"
-                            kubectl set image deployment/feed-service \\
-                                feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
+                            kubectl set image deployment/feed-service \
+                                feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \
                                 -n \$NAMESPACE
 
+                            # 更新 frontend 镜像版本
                             echo "Updating frontend image to ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}"
-                            kubectl set image deployment/frontend \\
-                                frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
+                            kubectl set image deployment/frontend \
+                                frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \
                                 -n \$NAMESPACE || true
 
                             # 等待滚动更新完成
-                            kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
-                            kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || true
+                            kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || echo "feed-service rollout timed out"
+                            kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || echo "frontend rollout timed out"
 
                             # 显示部署状态
+                            echo "=== Pods ==="
                             kubectl get pods -n \$NAMESPACE
+                            echo "=== Services ==="
                             kubectl get svc -n \$NAMESPACE
+                            echo "=== Deployments ==="
+                            kubectl get deployment -n \$NAMESPACE
                         '
                     '
                 }

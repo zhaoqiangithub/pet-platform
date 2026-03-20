@@ -8,6 +8,7 @@ namespace: pet-platform-prod
 
 resources:
   - ../../feed-service
+  - ../../frontend
   - namespace.yaml
   - image-pull-secret.yaml
 

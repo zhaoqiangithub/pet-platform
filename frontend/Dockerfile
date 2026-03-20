@@ -5,16 +5,13 @@ WORKDIR /app
 # 复制依赖文件
 COPY package.json package-lock.json ./
 
-# 安装依赖（使用legacy-peer-deps解决版本冲突）
+# 安装所有依赖（包括 react-dom、react-native-web）
 RUN npm ci --legacy-peer-deps
 
 # 复制源代码
 COPY . .
 
-# 安装 Web 支持依赖（使用legacy-peer-deps）
-RUN npx expo install react-dom react-native-web @expo/metro-runtime -- --legacy-peer-deps
-
-# 构建 Web 应用（Expo）
+# 构建 Web 应用（Expo SDK 52 输出到 dist/）
 RUN npx expo export
 
 # 生产阶段 - Nginx
