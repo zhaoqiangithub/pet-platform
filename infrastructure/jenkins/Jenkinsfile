@@ -54,10 +54,10 @@ pipeline {
             }
             steps {
                 echo 'Syncing K8s config to remote server...'
-                sh """
-                    export SSHPASS="${K8S_SSH_PASSWORD_PSW}"
+                sh '''
+                    export SSHPASS="${K8S_SSH_PASSWORD}"
                     # 创建远程服务器上的 K8s 配置目录
-                    sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} 'mkdir -p /opt/pet-platform/k8s/overlays/test /opt/pet-platform/k8s/overlays/prod'
+                    sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} ''mkdir -p /opt/pet-platform/k8s/overlays/test /opt/pet-platform/k8s/overlays/prod''
                     # 同步 K8s 配置文件
                     sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/test ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/overlays/ || true
                     sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/prod ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/overlays/ || true
@@ -65,8 +65,7 @@ pipeline {
                     sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/feed-service ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/ || true
                     # 同步 frontend 基础配置
                     sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/frontend ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/ || true
-                """
-                }
+                '''
             }
         }
 
@@ -250,7 +249,7 @@ pipeline {
 
                 withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
                     sh """
-                        export SSHPASS="${K8S_SSH_PASSWORD_PSW}"
+                        export SSHPASS="${K8S_SSH_PASSWORD}"
                         sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 
                             set -e
