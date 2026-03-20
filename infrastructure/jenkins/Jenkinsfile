@@ -53,6 +53,7 @@ pipeline {
                 echo 'Syncing K8s config to remote server...'
                 sh '''
                     export SSHPASS="${K8S_SSH_PASSWORD_PSW}"
+                    apt-get update && apt-get install -y sshpass 2>/dev/null || true
                     sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} "mkdir -p /opt/pet-platform/k8s/overlays/test /opt/pet-platform/k8s/overlays/prod"
                     sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/test ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/overlays/ || true
                     sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/prod ${K8S_SSH_USER}@${K8S_MASTER_IP}:/opt/pet-platform/k8s/overlays/ || true
@@ -230,6 +231,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
                     sh """
                         export SSHPASS="${K8S_SSH_PASSWORD_PSW}"
+                        apt-get update && apt-get install -y sshpass 2>/dev/null || true
                         sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
                             set -e
                             if [ "${env.BRANCH_NAME}" = "main" ]; then

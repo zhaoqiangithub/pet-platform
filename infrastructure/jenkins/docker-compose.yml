@@ -51,9 +51,10 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    # 容器启动后自动配置 Git 代理
+    # Container startup: install tools and configure git
     command: >
       bash -c "
+        apt-get update && apt-get install -y sshpass curl wget 2>/dev/null || true
         cp /var/jenkins_home/gitconfig.template /var/jenkins_home/.gitconfig 2>/dev/null || true
         sed -i 's|PROXY_HOST|${HTTP_PROXY_HOST:-}|g; s|PROXY_PORT|${HTTP_PROXY_PORT:-}|g' /var/jenkins_home/.gitconfig 2>/dev/null || true
         exec /usr/bin/tini -- /usr/local/bin/jenkins.sh
