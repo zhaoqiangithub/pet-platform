@@ -23,8 +23,8 @@ PetPal是一个跨平台宠物服务平台，支持Web、iOS、Android三端。�
 | 通知服务   | `/backend/notification-service/` | Spring Boot             | `NotificationApplication.java`    |
 | 网关       | `/backend/gateway-service/`      | Spring Cloud Gateway    | `GatewayApplication.java`         |
 | 文档       | `/docs/`                         | Markdown + OpenAPI      | `api-contracts/`, `requirements/` |
-| K8s配置    | `/k8s/`                          | YAML                    | `deployments/`, `services/`       |
-| 基础设施   | `/infrastructure/`               | Docker + K8s            | `jenkins/`, `harbor/`            |
+| K8s配置    | `/infrastructure/k8s/`         | YAML                    | `feed-service/`                 |
+| 基础设施   | `/infrastructure/`               | Docker + K8s            | `jenkins/`, `harbor/`, `k8s/` |
 
 ## 开发环境要求
 - Node.js 20+ (前端)
@@ -34,6 +34,25 @@ PetPal是一个跨平台宠物服务平台，支持Web、iOS、Android三端。�
 - Maven (后端构建)
 
 ## Claude Code 最佳实践
+
+### 敏感信息处理原则
+
+当遇到以下情况时，**必须向用户询问**，不要猜测：
+
+1. **账号/密码不确定**：如 Docker Hub、GitHub、Harbor 等服务的登录凭据
+2. **配置值不确定**：如服务器 IP、端口、代理地址等
+3. **环境变量缺失**：如 .env 文件中未定义的变量
+
+**询问模板**：
+```
+请提供以下信息以便继续：
+- [服务名称] 的用户名/密码
+- 或确认是否使用 [默认值]
+```
+
+**原因**：盲目猜测会导致解决方案方向错误，浪费时间。
+
+---
 
 ### MCP (Model Context Protocol) 扩展
 
@@ -112,6 +131,30 @@ kubectl apply -f k8s/user-service/
 # 全量测试
 ./scripts/test-all.sh
 
+# Git 提交规范
+
+### 重要规则
+- **禁止随意提交代码**：AI 不得未经用户允许擅自提交代码到 Git
+- **提交前必须确认**：每次提交前必须明确告知用户提交内容，待用户同意后再执行
+- **feature 分支流程**：所有功能开发必须在 feature 分支进行，通过 PR 合并到 dev 分支
+- **PR 审批机制**：合并到 dev 或 main 分支需要经过人工审批，禁止自动合并
+
+### 分支策略
+| 分支 | 用途 | 合并方式 |
+|------|------|----------|
+| `main` | 生产环境 | PR + 至少1人审批 |
+| `dev` | 开发/测试环境 | PR + 至少1人审批 |
+| `feature/*` | 功能开发 | PR 合并到 dev |
+| `fix/*` | 修复开发 | PR 合并到 dev |
+
+### 提交前的确认内容
+AI 需要向用户确认以下信息：
+1. 提交的目标分支
+2. 提交的具体内容（哪些文件、什么改动）
+3. 提交信息（commit message）
+
+---
+
 # 关键规则（AI必须遵守）
 ## 架构边界
 前端只能通过网关调用后端API，禁止直接访问微服务。
@@ -126,14 +169,14 @@ kubectl apply -f k8s/user-service/
 
 ### 核心原则
 - **所有服务必须容器化**：每个后端微服务和前端Web应用都需提供`Dockerfile`，使用多阶段构建减小镜像体积。
-- **Kubernetes配置与代码同源**：所有K8s YAML文件存放在`/k8s/`目录下，通过Kustomize管理环境差异。
+- **Kubernetes配置与代码同源**：所有K8s YAML文件存放在`/infrastructure/k8s/`目录下，通过Kustomize管理环境差异。
 - **AI同步生成**：在创建或修改服务时，AI应**同步生成或更新**对应的Dockerfile和K8s基础YAML模板，确保部署配置与代码变更一致。
 
 ### AI生成指令
 - **创建新服务时**：AI必须自动生成：
     - 后端服务：在服务根目录生成`Dockerfile`，参考后端规范（见`@./backend/CLAUDE.md`）。
     - 前端Web（如需容器化）：在`/frontend`生成`Dockerfile`，参考前端规范（见`@./frontend/CLAUDE.md`）。
-    - K8s基础配置：在`/k8s/base/{service-name}/`下生成`deployment.yaml`、`service.yaml`、`configmap.yaml`、`secret.yaml`（模板）。
+    - K8s基础配置：在`/infrastructure/k8s/{service-name}/`下生成`deployment.yaml`、`service.yaml`、`configmap.yaml`、`secret.yaml`（模板）。
 - **修改服务时**：若变更涉及环境变量、端口、资源需求等，AI应同步更新对应的K8s ConfigMap或Deployment配置，并确保环境覆盖（`overlays`）正确。
 - **添加外部依赖**：若新增依赖（如Redis、Kafka），AI应在`docker-compose.yml`（本地开发）和K8s基础配置中同步添加。
 
@@ -166,11 +209,19 @@ AI在生成或更新Docker/K8s配置后，必须自动执行以下验证：
 
 **规则**：PR前只验证“配置是否正确”，PR后验证“部署是否能运行”。
 
-引用文档：`@./k8s/CLAUDE.md` 提供详细K8s配置规则，`@./infrastructure/CLAUDE.md` 提供详细基础设施配置规则。
+引用文档：`@./infrastructure/k8s/CLAUDE.md` 提供详细K8s配置规则，`@./infrastructure/CLAUDE.md` 提供详细基础设施配置规则。
 
 ## 基础设施部署
 
 本模块配置已迁移至 [infrastructure/CLAUDE.md](./infrastructure/CLAUDE.md)
+
+### 服务器信息
+
+| 环境 | IP/域名 | 用途 | 状态 |
+|------|---------|------|------|
+| CI/CD 服务器 | 100.75.140.35 | Jenkins + Docker Registry | 已部署 |
+| 测试环境 K8s | 100.89.107.21 (node1) | 测试环境部署 | 已配置 |
+| 生产环境 K8s | 位置保留 | 生产环境部署 | 待配置 |
 
 ## 代码质量
 前端：必须通过跨平台测试（iOS/Android/Web），使用Platform.select处理差异。

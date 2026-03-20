@@ -117,15 +117,3 @@ services:
 networks:
   harbor:
     name: harbor-network
-
-volumes:
-  /data:
-    driver: local
-  /data/ca_download:
-  /data/registry:
-  /data/chart_storage:
-  /data/jobservice:
-  /data/redis:
-  /data/trust_cert:
-  /data/secret_keys:
-  /data/database:

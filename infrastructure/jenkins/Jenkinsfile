@@ -1,45 +1,41 @@
 // Jenkins Pipeline - 宠物平台 CI/CD
 // 支持多分支构建
-// 使用 Docker Pipeline 管理工具版本
 
 pipeline {
-    // 默认使用 Docker 容器
-    agent {
-        docker {
-            image 'maven:3.9-eclipse-temurin-17'
-            label 'docker'
-            args '-v /root/.m2:/root/.m2'
-        }
-    }
+    agent any
 
     environment {
-        // GitHub Container Registry 配置
-        REGISTRY_URL = 'ghcr.io'
-        REGISTRY_OWNER = 'zhaoqiangithub'
-        IMAGE_NAME = 'pet-platform'
-        DOCKER_REGISTRY = "${REGISTRY_URL}/${REGISTRY_OWNER}/${IMAGE_NAME}"
+        // Docker Registry 配置
+        // CI/CD 服务器: 100.75.140.35, K8s 集群通过此地址拉取镜像
+        REGISTRY_URL = "${params.REGISTRY_URL ?: '100.75.140.35'}"
+        REGISTRY_PORT = "${params.REGISTRY_PORT ?: '5000'}"
+        REGISTRY_PROJECT = "${params.REGISTRY_PROJECT ?: 'pet-platform'}"
+        DOCKER_REGISTRY = "${REGISTRY_URL}:${REGISTRY_PORT}/${REGISTRY_PROJECT}"
 
-        // GitHub 凭证 (需要在 Jenkins 中配置 github-token)
-        GITHUB_TOKEN = credentials('github-token')
+        // Registry 凭证（使用 withCredentials 获取）
+        REGISTRY_USER = "${params.REGISTRY_USER ?: 'admin'}"
+        REGISTRY_PASSWORD = credentials('registry-credential')
 
-        // K8s 配置 (从环境变量或默认值读取)
+        // K8s 配置
         K8S_MASTER_IP = "${params.K8S_MASTER_IP ?: '100.89.107.21'}"
         K8S_SSH_USER = "${params.K8S_SSH_USER ?: 'root'}"
         K8S_TEST_NS = "${params.K8S_TEST_NS ?: 'pet-platform-test'}"
         K8S_PROD_NS = "${params.K8S_PROD_NS ?: 'pet-platform-prod'}"
-
-        // K8s SSH 密码 (需要在 Jenkins 中配置 k8s-ssh-credential)
         K8S_SSH_PASSWORD = credentials('k8s-ssh-credential')
+
+        // 镜像加速配置（国内环境使用）
+        MAVEN_MIRROR = "${params.MAVEN_MIRROR ?: 'https://maven.aliyun.com/repository/public'}"
+        NPM_MIRROR = "${params.NPM_MIRROR ?: 'https://registry.npmmirror.com'}"
     }
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         timestamps()
     }
 
     stages {
-        // 1. 环境准备
+        // 1. Checkout
         stage('Checkout') {
             steps {
                 echo 'Checkout source code...'
@@ -47,7 +43,31 @@ pipeline {
             }
         }
 
-        // 2. 后端构建 - 使用 Maven 容器
+        // 1.1 同步 K8s 配置到远程服务器
+        stage('Sync K8s Config') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'feature/**'
+                }
+            }
+            steps {
+                echo 'Syncing K8s config to remote server...'
+                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernamePasswordVariable: 'REGISTRY_CREDS')]) {
+                    sh """
+                        export SSHPASS="${K8S_SSH_PASSWORD}"
+                        # 创建远程服务器上的 K8s 配置目录
+                        sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} 'mkdir -p /tmp/k8s/overlays/test /tmp/k8s/overlays/prod'
+                        # 同步 K8s 配置文件（使用 scp）
+                        sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/test/* ${K8S_SSH_USER}@${K8S_MASTER_IP}:/tmp/k8s/overlays/test/ || true
+                        sshpass -e scp -o StrictHostKeyChecking=no -r infrastructure/k8s/overlays/prod/* ${K8S_SSH_USER}@${K8S_MASTER_IP}:/tmp/k8s/overlays/prod/ || true
+                    """
+                }
+            }
+        }
+
+        // 2. 后端构建
         stage('Build Backend') {
             when {
                 anyOf {
@@ -61,18 +81,21 @@ pipeline {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
                     args '-v /root/.m2:/root/.m2'
+                    reuseNode true
                 }
             }
             steps {
-                echo 'Building backend with Maven 3.9 + JDK 17...'
+                echo 'Building backend with Maven...'
+                echo "Using Maven mirror: ${MAVEN_MIRROR}"
                 dir('backend/feed-service') {
+                    // 配置 Maven 阿里云镜像
                     sh 'mvn --version'
-                    sh 'mvn clean package -DskipTests'
+                    sh "mvn clean package -DskipTests -Dmaven.repo.remote=https://maven.aliyun.com/repository/public"
                 }
             }
         }
 
-        // 3. 前端构建 - 使用 Node.js 容器
+        // 3. 前端构建
         stage('Build Frontend') {
             when {
                 anyOf {
@@ -85,20 +108,25 @@ pipeline {
             agent {
                 docker {
                     image 'node:20'
+                    reuseNode true
                 }
             }
             steps {
-                echo 'Building frontend with Node.js 20...'
+                echo 'Building frontend with Node.js...'
+                echo "Using NPM mirror: ${NPM_MIRROR}"
                 dir('frontend') {
                     sh 'node --version'
                     sh 'npm --version'
+                    // 配置 NPM 淘宝镜像
+                    sh 'npm config set registry ${NPM_MIRROR}'
+                    sh 'npm config get registry'
                     sh 'npm ci --legacy-peer-deps'
                     sh 'npx expo export'
                 }
             }
         }
 
-        // 4. 单元测试
+        // 4. 测试
         stage('Test Backend') {
             when {
                 anyOf {
@@ -112,6 +140,7 @@ pipeline {
                 docker {
                     image 'maven:3.9-eclipse-temurin-17'
                     args '-v /root/.m2:/root/.m2'
+                    reuseNode true
                 }
             }
             steps {
@@ -134,6 +163,7 @@ pipeline {
             agent {
                 docker {
                     image 'node:20'
+                    reuseNode true
                 }
             }
             steps {
@@ -154,19 +184,19 @@ pipeline {
                 }
             }
             steps {
-                echo 'Building and pushing backend Docker image to ghcr.io...'
-                dir('backend/feed-service') {
-                    sh """
-                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
-
-                        docker build -t ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} .
-                        docker build -t ${DOCKER_REGISTRY}/feed-service:latest .
-
-                        docker push ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}
-                        docker push ${DOCKER_REGISTRY}/feed-service:latest
-
-                        docker logout ${REGISTRY_URL}
-                    """
+                echo 'Building and pushing backend Docker image...'
+                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+                    sh '''
+                        echo "Logging in to Docker Registry..."
+                        unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+                        export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16"
+                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
+                        cd backend/feed-service
+                        docker build -t $DOCKER_REGISTRY/feed-service:$GIT_COMMIT .
+                        docker build -t $DOCKER_REGISTRY/feed-service:latest .
+                        docker push $DOCKER_REGISTRY/feed-service:$GIT_COMMIT
+                        docker push $DOCKER_REGISTRY/feed-service:latest
+                    '''
                 }
             }
         }
@@ -181,72 +211,95 @@ pipeline {
                 }
             }
             steps {
-                echo 'Building and pushing frontend Docker image to ghcr.io...'
-                dir('frontend') {
-                    sh """
-                        echo ${GITHUB_TOKEN} | docker login ${REGISTRY_URL} -u ${GITHUB_TOKEN_USR} --password-stdin
-
-                        docker build -t ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} .
-                        docker build -t ${DOCKER_REGISTRY}/frontend:latest .
-
-                        docker push ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}
-                        docker push ${DOCKER_REGISTRY}/frontend:latest
-
-                        docker logout ${REGISTRY_URL}
-                    """
+                echo 'Building and pushing frontend Docker image...'
+                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+                    sh '''
+                        echo "Logging in to Docker Registry..."
+                        unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+                        export no_proxy="localhost,127.0.0.1,pet-registry,registry,jenkins_default,docker-registry_default,192.168.0.0/16,172.18.0.0/16,172.19.0.0/16"
+                        docker login $REGISTRY_URL:$REGISTRY_PORT -u $REGISTRY_USER -p "$REGISTRY_PASSWORD" || true
+                        cd frontend
+                        docker build -t $DOCKER_REGISTRY/frontend:$GIT_COMMIT .
+                        docker build -t $DOCKER_REGISTRY/frontend:latest .
+                        docker push $DOCKER_REGISTRY/frontend:$GIT_COMMIT
+                        docker push $DOCKER_REGISTRY/frontend:latest
+                    '''
                 }
             }
         }
 
-        // 7. 部署到 K8s (通过 SSH)
+        // 7. 部署到 K8s
         stage('Deploy to K8s') {
             when {
                 anyOf {
                     branch 'main'
                     branch 'dev'
+                    branch 'feature/**'
                 }
             }
             steps {
-                echo "Deploying to K8s via SSH (${env.BRANCH_NAME} environment)..."
+                echo "Deploying to K8s..."
 
                 script {
                     def targetNamespace = env.BRANCH_NAME == 'main' ? "${K8S_PROD_NS}" : "${K8S_TEST_NS}"
-                    def k8sMaster = "${K8S_SSH_USER}@${K8S_MASTER_IP}"
-                    echo "Target namespace: ${targetNamespace}, K8s Master: ${k8sMaster}"
+                    echo "Target namespace: ${targetNamespace}"
                 }
 
-                // 通过 SSH 连接到 K8s master 执行部署
-                sh """
-                    export SSHPASS="${K8S_SSH_PASSWORD}"
-                    sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
+                withCredentials([usernamePassword(credentialsId: 'registry-credential', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+                    sh """
+                        export SSHPASS="${K8S_SSH_PASSWORD}"
+                        sshpass -e ssh -o StrictHostKeyChecking=no ${K8S_SSH_USER}@${K8S_MASTER_IP} '
 
-                        if [ "${env.BRANCH_NAME}" = "main" ]; then
-                            NAMESPACE="${K8S_PROD_NS}"
-                            echo "Deploying to PRODUCTION: \$NAMESPACE"
-                        else
-                            NAMESPACE="${K8S_TEST_NS}"
-                            echo "Deploying to TEST: \$NAMESPACE"
-                        fi
+                            if [ "${env.BRANCH_NAME}" = "main" ]; then
+                                NAMESPACE="${K8S_PROD_NS}"
+                            elif [ "${env.BRANCH_NAME}" = "dev" ]; then
+                                NAMESPACE="${K8S_TEST_NS}"
+                            else
+                                # feature 分支部署到测试环境
+                                NAMESPACE="${K8S_TEST_NS}"
+                            fi
 
-                        echo "Updating feed-service image..."
-                        kubectl set image deployment/feed-service \\
-                            feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
-                            -n \$NAMESPACE
+                            echo "Deploying to namespace: \$NAMESPACE"
 
-                        echo "Updating frontend image..."
-                        kubectl set image deployment/frontend \\
-                            frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
-                            -n \$NAMESPACE
+                            # 创建 namespace（如果不存在）
+                            kubectl create namespace \$NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
-                        echo "Waiting for rollout..."
-                        kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
-                        kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || true
+                            # 创建 image pull secret（如果不存在）
+                            kubectl create secret docker-registry registry-secret \\
+                                --docker-server=${REGISTRY_URL}:${REGISTRY_PORT} \\
+                                --docker-username=${REGISTRY_USER} \\
+                                --docker-password="${REGISTRY_PASSWORD}" \\
+                                --docker-email=admin@pet.com \\
+                                -n \$NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
-                        echo "Deployment status:"
-                        kubectl get pods -n \$NAMESPACE
-                        kubectl get svc -n \$NAMESPACE
+                            # 检查 deployment 是否存在，不存在则先部署基础配置
+                            if ! kubectl get deployment feed-service -n \$NAMESPACE 2>/dev/null; then
+                                echo "Deployment not found, deploying base configuration..."
+                                # 使用 kustomize 部署基础配置
+                                kubectl apply -k /tmp/k8s/overlays/test -n \$NAMESPACE || true
+                            fi
+
+                            # 更新镜像版本
+                            echo "Updating feed-service image to ${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT}"
+                            kubectl set image deployment/feed-service \\
+                                feed-service=${DOCKER_REGISTRY}/feed-service:\${GIT_COMMIT} \\
+                                -n \$NAMESPACE
+
+                            echo "Updating frontend image to ${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT}"
+                            kubectl set image deployment/frontend \\
+                                frontend=${DOCKER_REGISTRY}/frontend:\${GIT_COMMIT} \\
+                                -n \$NAMESPACE || true
+
+                            # 等待滚动更新完成
+                            kubectl rollout status deployment/feed-service -n \$NAMESPACE --timeout=300s || true
+                            kubectl rollout status deployment/frontend -n \$NAMESPACE --timeout=300s || true
+
+                            # 显示部署状态
+                            kubectl get pods -n \$NAMESPACE
+                            kubectl get svc -n \$NAMESPACE
+                        '
                     '
-                """
+                }
             }
         }
     }

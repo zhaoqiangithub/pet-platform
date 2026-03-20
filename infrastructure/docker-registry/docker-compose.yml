@@ -37,3 +37,10 @@ services:
 volumes:
   registry_data:
     driver: local
+
+networks:
+  default:
+    name: jenkins_default
+    external: true
+  jenkins_default:
+    external: true
