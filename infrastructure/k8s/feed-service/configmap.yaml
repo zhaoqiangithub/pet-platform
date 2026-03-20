@@ -1,57 +1,11 @@
 # K8s ConfigMap - feed-service
+# 注意: 实际配置由 overlays 环境覆盖
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: feed-service-config
-  namespace: pet-platform
+  namespace: placeholder-namespace
   labels:
     app: feed-service
 data:
-  application.yml: |
-    server:
-      port: 8085
-
-    spring:
-      application:
-        name: feed-service
-      datasource:
-        url: jdbc:postgresql://postgres:5432/pet_feed
-        username: postgres
-        password: postgres
-        driver-class-name: org.postgresql.Driver
-        hikari:
-          maximum-pool-size: 10
-          minimum-idle: 5
-          connection-timeout: 30000
-      redis:
-        host: redis
-        port: 6379
-        database: 0
-      cloud:
-        nacos:
-          discovery:
-            server-addr: nacos:8848
-            namespace: dev
-          config:
-            server-addr: nacos:8848
-            namespace: dev
-            file-extension: yml
-
-    mybatis-plus:
-      configuration:
-        log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-      global-config:
-        db-config:
-          logic-delete-field: deleted
-          logic-delete-value: 1
-          logic-not-delete-value: 0
-
-    # 暴露健康检查端点
-    management:
-      endpoints:
-        web:
-          exposure:
-            include: health,info
-      endpoint:
-        health:
-          show-details: always
+  SPRING_PROFILES_ACTIVE: "placeholder-env"

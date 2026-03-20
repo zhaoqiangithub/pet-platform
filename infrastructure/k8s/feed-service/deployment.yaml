@@ -1,9 +1,10 @@
 # K8s Deployment - feed-service
+# 注意: 镜像地址由 CI/CD 在部署时动态替换
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: feed-service
-  namespace: pet-platform
+  namespace: placeholder-namespace
   labels:
     app: feed-service
     version: v1
@@ -18,16 +19,18 @@ spec:
         app: feed-service
         version: v1
     spec:
+      imagePullSecrets:
+        - name: registry-secret
       containers:
         - name: feed-service
-          image: pet-platform/feed-service:latest
-          imagePullPolicy: IfNotPresent
+          image: 100.75.140.35:5000/pet-platform/feed-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8085
               protocol: TCP
           env:
             - name: SPRING_PROFILES_ACTIVE
-              value: "prod"
+              value: "placeholder-env"
             - name: JAVA_OPTS
               value: "-Xms256m -Xmx512m -XX:+UseG1GC"
           resources:

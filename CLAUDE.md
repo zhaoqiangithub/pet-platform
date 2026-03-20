@@ -215,6 +215,14 @@ AI在生成或更新Docker/K8s配置后，必须自动执行以下验证：
 
 本模块配置已迁移至 [infrastructure/CLAUDE.md](./infrastructure/CLAUDE.md)
 
+### 服务器信息
+
+| 环境 | IP/域名 | 用途 | 状态 |
+|------|---------|------|------|
+| CI/CD 服务器 | 100.75.140.35 | Jenkins + Docker Registry | 已部署 |
+| 测试环境 K8s | 100.89.107.21 (node1) | 测试环境部署 | 已配置 |
+| 生产环境 K8s | 位置保留 | 生产环境部署 | 待配置 |
+
 ## 代码质量
 前端：必须通过跨平台测试（iOS/Android/Web），使用Platform.select处理差异。
 

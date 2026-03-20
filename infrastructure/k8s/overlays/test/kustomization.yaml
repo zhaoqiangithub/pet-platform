@@ -1,0 +1,24 @@
+# Kustomization - 测试环境
+# 使用: kubectl apply -k infrastructure/k8s/overlays/test
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pet-platform-test
+
+resources:
+  - ../../feed-service
+  - namespace.yaml
+  - image-pull-secret.yaml
+
+# 环境特定配置
+configMapGenerator:
+  - name: feed-service-config
+    behavior: replace
+    literals:
+      - SPRING_PROFILES_ACTIVE=test
+
+# 镜像 tag 覆盖（可选，默认使用 latest）
+# images:
+#   - name: localhost:5000/pet-platform/feed-service
+#     newTag: latest

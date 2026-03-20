@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: feed-service
-  namespace: pet-platform
+  namespace: placeholder-namespace
   labels:
     app: feed-service
 spec:
@@ -21,7 +21,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: feed-service-headless
-  namespace: pet-platform
+  namespace: placeholder-namespace
   labels:
     app: feed-service
 spec:
